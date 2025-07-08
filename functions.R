@@ -222,10 +222,6 @@ fission <- function(A, theta=0.5){
 #' @param theta parameter in data-splitting
 #' @return e-value
 #' @export
-
-
-# Returns likelihood ratio test statistic testing
-# H0: ER vs. H1: SBM
 eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM"), h1=c("CL", "SBM", "DCBM", "PABM"), 
                  h0K, h1K, theta=0.5){
   
@@ -272,14 +268,11 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM"), h1=c("CL", "SBM", "DCBM", "
   # Estimate parameters under H0
   if(h0=="ER"){
     paramsZ = estparam(Z, "ER")
-    paramsZ$p = paramsZ$p
   }else if(h1=="CL"){
     paramsZ = estparam(Z, "CL")
-    paramsZ$psi = paramsZ$psi
   }else{
     CZ = spectral(Z, h0K)
     paramsZ = estparam(Z, h0, CZ)
-    paramsZ$B = paramsZ$B
   }
   
   # Evaluate log-likelihood using Z and parameters from Z
@@ -290,9 +283,11 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM"), h1=c("CL", "SBM", "DCBM", "
   return(exp(L1 - L0))
 }
 
-# Added comment
-
-# Bickel and Sarkar methods
+#' @title Community detection p-value
+#' @description Computes p-value for testing against ER null using Bickel and Sarkar (2016) method
+#' @param A adjacency matrix
+#' @return p-value
+#' @export
 spectral.pval <- function(A){
   
   n=dim(A)[1]
@@ -308,6 +303,11 @@ spectral.pval <- function(A){
   return(RMTstat::ptw(obs.stat, beta=1, lower.tail = FALSE))
 }
 
+#' @title Community detection p-value (with bootstrap)
+#' @description Computes p-value for testing against ER null using Bickel and Sarkar (2016) bootstrap method
+#' @param A adjacency matrix
+#' @return p-value
+#' @export
 spectral.adj.pval <- function(A){
   
   n=dim(A)[1]
@@ -342,55 +342,9 @@ spectral.adj.pval <- function(A){
 }
 
 
-n = 1000
-B = matrix(c(0.2,0.1,0.1,0.2), ncol=2)
-C = c(rep(1,n/2), rep(2,n/2))
-A <- generateSBM(n, B, C)
-
-#A <- generateER(n, 0.2)
-plot_matrix(A)
-
-out <- fission(A, 0.5)
-A0 = out$A0
-A1 = out$A1
-
-
-eval(A0,A1,2)
-spectral.adj.pval(A)
-
-croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")
 
 
 
-
-# Title: Model selection on networks with data fission and universal inference
-# This seems promising!
-# We started with a single network,
-# carried out data fission to get two independent copies (key that they are ind.)
-# and then used UI and e-values for model selection.
-# Yields tiny e-values for ER and huge e-values for SBM!
-# Showed this for ER vs. SBM
-# But this should work more broadly for any model comparison
-# Have three simulation examples: 
-  # 1. model selection (ER vs SBM, CL vs DCBM, SBM vs DCBM, DCBM vs PABM, etc)
-  # 2. selecting number of communities (K vs K+1 and K vs K-1 in SBM, DCBM and PABM)
-  # 3. Estimating latent-space dimension of RDPG
-  # 4. comparing meso-scale structures (CP vs community)
-# Apply it to political blogs network at the very least since so many models claim this one
-# Change it to use MLE to find optimal labels instead of spectral
-
-
-
-# Introduction
-# Model selection is important on networks
-# e.g., number of communities, which network model, dimension of latent space, etc.
-# There are methods to solve each of these questions
-# But they must be tailored to the particular problem and usually require a lot of theory
-# UI seems like a good approach to address this model-selection question
-# But the problem is, UI requires independent copies of the data
-# With networks, we usually only have one realization.
-# So what should we do?
-# Answer: data fission
 
 
 
