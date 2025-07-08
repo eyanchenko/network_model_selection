@@ -290,6 +290,7 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM"), h1=c("CL", "SBM", "DCBM", "
   return(exp(L1 - L0))
 }
 
+# Added comment
 
 # Bickel and Sarkar methods
 spectral.pval <- function(A){

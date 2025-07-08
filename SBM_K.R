@@ -2,8 +2,8 @@
 ## Eric Yanchenko
 ## May 1, 2025
 
-source("~/Documents/Research/NetworkModelSelection/netcrop.R")
-source("functions.R")
+source("~/Documents/Research/network_model_selection/netcrop.R")
+source("~/Documents/Research/network_model_selection/functions.R")
 
 ## Setting 1 - H0: SBM w/ K=1 (ER) vs. H1: SBM w/ K=2
 niter = 10
