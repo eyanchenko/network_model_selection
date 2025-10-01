@@ -357,13 +357,15 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
   }else if(h0=="SBM"){
     CZ = randnet::reg.SP(A = Z, K = h0K, tau = 0)$cluster # regular spectral clustering
     paramsZ = estparam(Z, h0, CZ)
+  }else if(h0=="DCBM"){
+    CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 0)$cluster # spherical spectral clustering
+    paramsZ = estparam(Z, h0, CZ)
   }else if(h0=="RDPG"){
     XZ = estparam(Z, "RDPG", d=h0K)$X
     paramsZ = list(X=XZ)
   }else if(h0=="LSM"){
     paramsZ = estparam(Z, "LSM", d=h0K)
   }
-  
   # Evaluate log-likelihood using Z and parameters from Z
   L0 = llike(Z, h0, paramsZ)
   
