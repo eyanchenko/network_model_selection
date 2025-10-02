@@ -369,8 +369,14 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
   # Evaluate log-likelihood using Z and parameters from Z
   L0 = llike(Z, h0, paramsZ)
   
-  # Return the quotient
-  return(exp(L1 - L0))
+  # Return the quotient, but upper bound it at ub for numerical stability
+  ub = 1e100
+  if((L1-L0) > log(ub)){
+    return(ub)
+  }else{
+    return(exp(L1 - L0))
+  }
+  
 }
 
 #' @title Universal Inference e-value for a multiple runs
