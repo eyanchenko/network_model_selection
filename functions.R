@@ -183,6 +183,10 @@ llike <- function(A, model, params){
     }
   }
   
+  eps = 1e-6
+  P[P < eps] <- eps
+  P[P > 1-eps] <- 1-eps
+  
   return(
     -sum(P[upper.tri(P)]) + sum(A[upper.tri(A)] * log(P[upper.tri(P)]))
   )
@@ -331,8 +335,8 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
     paramsY$psi = paramsY$psi * sqrt(theta)/ sqrt(1-theta)
   }else if(h1=="SBM" || h1=="DCBM"){
     
-    if(h1 == "SBM")  CY = randnet::reg.SP(A = Y, K = h1K, tau = 0)$cluster  # regular spectral clustering
-    if(h1 == "DCBM") CY = randnet::reg.SSP(A = Y, K = h1K, tau = 0)$cluster # spherical spectral clustering
+    if(h1 == "SBM")  CY = randnet::reg.SP(A = Y, K = h1K, tau = 1)$cluster  # regular spectral clustering
+    if(h1 == "DCBM") CY = randnet::reg.SSP(A = Y, K = h1K, tau = 1)$cluster # spherical spectral clustering
     
     paramsY = estparam(Y, h1, CY)
     paramsY$B = paramsY$B * theta / (1-theta)
@@ -355,10 +359,10 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
   }else if(h0=="CL"){
     paramsZ = estparam(Z, "CL")
   }else if(h0=="SBM"){
-    CZ = randnet::reg.SP(A = Z, K = h0K, tau = 0)$cluster # regular spectral clustering
+    CZ = randnet::reg.SP(A = Z, K = h0K, tau = 1)$cluster # regular spectral clustering
     paramsZ = estparam(Z, h0, CZ)
   }else if(h0=="DCBM"){
-    CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 0)$cluster # spherical spectral clustering
+    CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 1)$cluster # spherical spectral clustering
     paramsZ = estparam(Z, h0, CZ)
   }else if(h0=="RDPG"){
     XZ = estparam(Z, "RDPG", d=h0K)$X
