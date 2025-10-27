@@ -24,7 +24,7 @@ nreps = 100
 
 nu.seq <- seq(0.25, 0.5, length=11)
 
-methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP")
+methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP", "ECV")
 
 df <- tibble(iter = rep(rep(1:niter,each=length(methods)), length(nu.seq)), 
              Method=rep(methods, niter*length(nu.seq)), 
@@ -60,9 +60,15 @@ for(nu in nu.seq){
     
     # Reject if it chooses DCBM with K communities
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=K, s=5, o=100, R=1, loss="l2")$l2.model=="DCBM-2")
+      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-2")
     )[3]
     df$rej[cnt+3] <- rej
+    
+    # Reject if it chooses DCBM with 2 communities (ECV)
+    df$time[cnt+4] <- system.time(
+      rej <- as.numeric(ECV.for.blockmodel(A, 2)$l2.model=="DCSBM-2")
+    )[3]
+    df$rej[cnt+4] <- rej
     
     
     cnt = cnt + length(methods)
@@ -99,6 +105,8 @@ ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 
 ## Setting 3 (b) -  H0: SBM w/ K=5  vs. H1: DCBM w/ K=5
 ## Increasing variance of degree parameters
+
+
 niter = 100
 n = 1000
 alpha = 0.5
@@ -107,10 +115,11 @@ K = 5
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
 #pi = c(0.40, 0.15, 0.15, 0.15, 0.15)
 pi = rep(1/K, K)
+nreps = 25
 
-nu.seq <- seq(0.25, 0.5, length=11)
+nu.seq <- seq(0, 0.75, length=21)
 
-methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP")
+methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP", "ECV")
 
 df <- tibble(iter = rep(rep(1:niter,each=length(methods)), length(nu.seq)), 
              Method=rep(methods, niter*length(nu.seq)), 
@@ -129,27 +138,35 @@ for(nu in nu.seq){
     params = list(psi=psi, B=B, C=C)
     A <- generateA("DCBM", params)
     
+    eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1)
     
-    # E-value with gamma = 0.4
-    # Reject if e-value is greater than 20.
-    # df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "DCBM", "DCBM", K-1, K, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    
+    # # E-value with gamma = 0.4
+    # # Reject if e-value is greater than 20.
+    # df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     # df$rej[cnt]  <- rej
-    
-    # E-value with gamma = 0.5
-    # Reject if e-value is greater than 20.
-    df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "DCBM", "DCBM", K-1, K, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    df$rej[cnt+1]  <- rej
-    
+    # 
+    # # E-value with gamma = 0.5
+    # # Reject if e-value is greater than 20.
+    # df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    # df$rej[cnt+1]  <- rej
+
     # E-value with gamma = 0.6
     # Reject if e-value is greater than 20.
-    # df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "DCBM", "DCBM", K-1, K, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    # df$rej[cnt+2]  <- rej
+    df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$rej[cnt+2]  <- rej
     
     # Reject if it chooses DCBM with K communities
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=K, s=5, o=100, R=1, loss="l2")$l2.model=="DCBM-5")
+      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=5, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-5")
     )[3]
     df$rej[cnt+3] <- rej
+    
+    # Reject if it chooses DCBM with 5 communities (ECV)
+    df$time[cnt+4] <- system.time(
+      rej <- as.numeric(ECV.for.blockmodel(A, 5)$l2.model=="DCSBM-2")
+    )[3]
+    df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
     
@@ -162,8 +179,6 @@ for(nu in nu.seq){
 load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu.RData")
 
 df_plot <- df %>% group_by(Method, nu) %>% summarize(rej = mean(rej), time=mean(time))
-df_plot <- df_plot[df_plot$nu > 0, ]
-
 
 p1 <- ggplot(df_plot, aes(x=nu, y=rej, color=Method))+
   geom_point()+

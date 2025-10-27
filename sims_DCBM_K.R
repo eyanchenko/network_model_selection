@@ -20,7 +20,7 @@ beta.seq = seq(0.6, 0.8, length=11)
 delta=0.25
 K = 2
 
-methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP")
+methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP", "ECV")
 
 df <- tibble(iter = rep(rep(1:niter,each=length(methods)), length(beta.seq)), 
              Method=rep(methods, niter*length(beta.seq)), 
@@ -56,11 +56,17 @@ for(beta in beta.seq){
     df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "CL", "DCBM", 2, 2, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+2]  <- rej
     
-    # Reject if it chooses SBM with 2 community
+    # Reject if it chooses DCBM with 2 community
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="DCBM-2")
+      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-2")
     )[3]
     df$rej[cnt+3] <- rej
+    
+    # Reject if it chooses DCBM with 2 community (ECV)
+    df$time[cnt+4] <- system.time(
+      rej <- as.numeric(ECV.for.blockmodel(A, 2)$l2.model=="DCSBM-2")
+    )[3]
+    df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
     
@@ -102,14 +108,15 @@ ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 niter = 100
 n = 1000
 alpha = 0.5
-beta = 0.6
+beta = 0.7
 delta.seq = seq(0.05, 0.5, length=10)
 pp = 0.5
 K = 2
 
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
 
-methods = c("e-value0.1", "e-value0.5", "e-value0.9", "NETCROP")
+methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP")
+
 
 df <- tibble(iter = rep(rep(1:niter,each=length(methods)), length(delta.seq)), 
              Method=rep(methods, niter*length(delta.seq)), 
@@ -133,7 +140,7 @@ for(delta in delta.seq){
     
     # E-value with gamma = 0.1
     # Reject if e-value is greater than 20.
-    df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "CL", "DCBM", 2, 2, 0.1, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "CL", "DCBM", 2, 2, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt]  <- rej
     
     # E-value with gamma = 0.5
@@ -143,14 +150,20 @@ for(delta in delta.seq){
     
     # E-value with gamma = 0.9
     # Reject if e-value is greater than 20.
-    df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "CL", "DCBM", 2, 2, 0.9, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "CL", "DCBM", 2, 2, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+2]  <- rej
     
     # Reject if it chooses SBM with 2 community
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="DCBM-2")
+      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-2")
     )[3]
     df$rej[cnt+3] <- rej
+    
+    # Reject if it chooses DCBM with 2 community (ECV)
+    df$time[cnt+4] <- system.time(
+      rej <- as.numeric(ECV.for.blockmodel(A, 2)$l2.model=="DCSBM-2")
+    )[3]
+    df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
     save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta.RData")
@@ -234,11 +247,17 @@ for(delta in delta.seq){
     df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "DCBM", "DCBM", K-1, K, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+2]  <- rej
     
-    # Reject if it chooses DCBM with K communities
+    # Reject if it chooses DCBM with 5 communities
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=K, s=5, o=100, R=1, loss="l2")$l2.model=="DCBM-5")
+      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=5, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-5")
     )[3]
     df$rej[cnt+3] <- rej
+    
+    # Reject if it chooses DCBM with 5 communities (ECV)
+    df$time[cnt+4] <- system.time(
+      rej <- as.numeric(ECV.for.blockmodel(A, 5)$l2.model=="DCSBM-5")
+    )[3]
+    df$rej[cnt+4] <- rej
     
 
     cnt = cnt + length(methods)
