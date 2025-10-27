@@ -109,9 +109,9 @@ generateA <- function(model=c("ER", "CL", "SBM", "DCBM", "RDPG", "MMSBM", "LSM")
 #' @return evaluation of log-likelihood
 #' @export
 llike <- function(A, model, params){
-  if(!(model %in% c("ER", "CL", "SBM", "DCBM", "RDPG", "MMSBM", "LSM"))){
+  if(!(model %in% c("ER", "CL", "SBM", "DCBM", "PABM", "RDPG", "MMSBM", "LSM"))){
     stop("Please enter a valid model name. Erdos-Renyi (=ER), Chung-Lu (=CL),
-    Stochastic-block model (=SBM), degree-corrected block model (DCBM),
+    Stochastic-block model (=SBM), Popularity adjusted block model (PABM), degree-corrected block model (DCBM),
          Random Dot Product Graph (RDPG)", "Mixed-membership SBM (MMSBM), 
          Latent-space model (LSM)")
   }
@@ -151,6 +151,24 @@ llike <- function(A, model, params){
     
     P <- Z%*%B%*%t(Z)
     P <- psi%*%t(psi) * P
+  }else if(model=="PABM"){
+    C = params$C
+    lambda = params$lambda
+    n = length(C)
+    
+    P = matrix(0, nrow = n, ncol = n)
+    for (i in 1:n){  	# populate diagonal entries
+      r = C[i]
+      P[i,i] = (1/2)*(lambda[i,r]^2)
+      }	# divide by 2 --- see notes section 3.3
+    
+    for (i in 1:(n-1)) {
+      for (j in (i+1):n) {
+        p = lambda[i,C[j]]*lambda[j,C[i]]
+        P[i,j] = p
+        P[j,i] = P[i,j]
+      }}
+     
   }else if (model=="RDPG"){
     X = params$X
     P = X%*%t(X)  
@@ -192,6 +210,26 @@ llike <- function(A, model, params){
   )
 }
 
+# Needed for PABM estimation
+f.PA<-function(A,b){	
+  K<-max(b)       # no. of communities
+  N<-nrow(A)      # no. of nodes
+  M<-matrix(NA,nrow=N,ncol=K)  # popularity matrix
+  O<-matrix(NA,nrow=K,ncol=K)  # community interaction matrix
+  for (i in 1:N){		# calculate M
+    for (r in 1:K){
+      nodes = which(b == r)
+      M[i,r] = sum(A[i,nodes])
+    }}
+  for (r in 1:K){		# calculate O
+    for (s in r:K){
+      nodes1 = which(b == r)
+      nodes2 = which(b == s)
+      O[r,s] = sum(A[nodes1,nodes2])
+      O[s,r] = O[r,s]
+    }}
+  list(M=M, O=O)}
+
 #' @title Estimate model parameters
 #' @description Estimates model parameters for random graph model
 #' @param A adjacency matrix
@@ -202,10 +240,10 @@ llike <- function(A, model, params){
 #' @return estimated parameter values
 #' @export
 estparam <- function(A, model, C, d, mmK){
-  if(!(model %in% c("ER", "CL", "SBM", "DCBM", "RDPG", "MMSBM", "LSM"))){
+  if(!(model %in% c("ER", "CL", "SBM", "DCBM", "PABM", "RDPG", "MMSBM", "LSM"))){
     stop("Please enter a valid model name. Erdos-Renyi (=ER), Chung-Lu (=CL),
     Stochastic-block model (=SBM), degree-corrected block model (DCBM),
-         Random Dot Product Graph (RDPG), mixed-membership SBM (MMSBM), Latent-space model (LSM)")
+    Popularity adjusted block model (=PABM), Random Dot Product Graph (RDPG), mixed-membership SBM (MMSBM), Latent-space model (LSM)")
   }
   
   n = nrow(A)
@@ -235,6 +273,17 @@ estparam <- function(A, model, C, d, mmK){
     psi = out$psi
     B = out$Bsum
     params = list(psi=psi, B=B, C=C)
+  }else if(model=="PABM"){
+    foo = f.PA(A,C)
+    M = foo$M
+    O = foo$O
+    lambda <- matrix(NA, nrow=n, ncol = max(C))
+    for (i in 1:n){
+      s <- C[i]
+      for (r in 1:max(C)){
+        lambda[i,r] <- M[i,r]/sqrt(O[s,r])} 
+    }
+    params = list(C=C, lambda = lambda)
   }else if (model=="RDPG"){
     #deg = rowSums(A) # if you want to use the Laplacian
     #D <- sparseMatrix(i = 1:n, j = 1:n, x = 1/sqrt(deg))
@@ -301,7 +350,7 @@ fission <- function(A, theta=0.5){
 #' @param theta parameter in data-splitting
 #' @return e-value
 #' @export
-eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "DCBM", "RDPG", "MMSBM", "LSM"), 
+eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM", "RDPG"), h1=c("CL", "SBM", "DCBM", "RDPG", "MMSBM", "LSM"), 
                  h0K, h1K, theta=0.5){
   
   if(h0==h1 && h0K==h1K){
@@ -313,15 +362,17 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
   }
   
   
-  if(!(h0 %in% c("ER", "CL", "SBM", "DCBM", "RDPG", "LSM"))){
+  if(!(h0 %in% c("ER", "CL", "SBM", "DCBM", "PABM", "RDPG", "LSM"))){
     stop("Please enter a valid model name. Erdos-Renyi (=ER), Chung-Lu (=CL),
     Stochastic-block model (=SBM), degree-corrected block model (DCBM),
+    Popularity adjusted block model (=PABM),
          random dot product graph (RDPG), Latent-space model (LSM)")
   }
   
-  if(!(h1 %in% c("CL", "SBM", "DCBM", "RDPG", "MMSBM", "LSM"))){
+  if(!(h1 %in% c("CL", "SBM", "DCBM", "PABM", "RDPG", "MMSBM", "LSM"))){
     stop("Please enter a valid model name. Chung-Lu (=CL),
     Stochastic-block model (=SBM), degree-corrected block model (DCBM),
+         Popularity adjusted block model (=PABM),
          random dot product graph (RDPG), mixed-membership SBM (MMSBM),
          Latent-space model (LSM)")
   }
@@ -340,6 +391,10 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
     
     paramsY = estparam(Y, h1, CY)
     paramsY$B = paramsY$B * theta / (1-theta)
+  }else if(h1=="PABM"){
+    CY = randnet::reg.SSP(A = Y, K = h1K, tau = 1)$cluster
+    paramsY = estparam(Y, "PABM", CY)
+    paramsY$lambda = paramsY$lambda * sqrt(theta) / sqrt((1-theta))
   }else if(h1=="RDPG"){
     XY = estparam(Y, "RDPG", NULL, h1K)$X * sqrt(theta) / sqrt((1-theta))
     paramsY = list(X=XY)
@@ -364,6 +419,9 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
   }else if(h0=="DCBM"){
     CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 1)$cluster # spherical spectral clustering
     paramsZ = estparam(Z, h0, CZ)
+  }else if(h0=="PABM"){
+    CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 1)$cluster # spherical spectral clustering
+    paramsZ = estparam(Z, h0, CZ)
   }else if(h0=="RDPG"){
     XZ = estparam(Z, "RDPG", d=h0K)$X
     paramsZ = list(X=XZ)
@@ -383,6 +441,7 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM", "
   
 }
 
+
 #' @title Universal Inference e-value for a multiple runs
 #' @description Computes Universal Inference e-value on split network
 #' @param A adjacency matrix
@@ -399,13 +458,26 @@ eval_mc <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "RDPG"), h1=c("CL", "SBM"
                  h0K, h1K, theta=0.5, nreps, ncores){
   
   apply_fun <- function(i){
-    eval(A, h0, h1, h0K, h1K, theta)
+    
+    err <- try(eval(A, h0, h1, h0K, h1K, theta),TRUE)
+    
+    if(class(err)=="try-error"){
+      return(NA)
+    }else{
+      return(err)
+    }
+    
   }
   
   out <- unlist(parallel::mclapply(1:nreps, apply_fun, mc.cores = ncores))
   
-  # Return the median
-  return(median(out))
+  if(mean(is.na(out)) > 0.05){
+    stop("More than 5% of the iterations yielded an error.")
+  }else{
+    # Return the median (and remove missing values)
+    return(median(out, na.rm = TRUE))
+  }
+  
 }
 
 #' @title Community detection p-value
@@ -465,3 +537,231 @@ spectral.adj.pval <- function(A){
   return(RMTstat::ptw(theta.prime, beta=1, lower.tail = FALSE))
   
 }
+
+
+## Yanchenko and Sengupta (2024) bootstrap method
+
+# Greedy community detection algorithm
+greedy <- function(A, K, runs=2, max.iter=100){
+  
+  n = dim(A)[1]
+  
+  # Find max e2d2 and corresponding labels
+  apply.fun <- function(i){
+    # Initialize communities
+    comm = sample(1:K,n,replace=T)
+    comm_old = comm
+    
+    # Community sizes
+    nc = numeric(K)
+    for(i in 1:K){nc[i] <- sum(comm==i)}
+    
+    
+    # Initial values
+    M   = sum(A)/2
+    Xin = 0
+    for(i in 1:K){Xin = Xin + sum(A[comm==i, comm==i])/2}
+    Xout = M - Xin
+    
+    m   = 0.5*n*(n-1)
+    m_in = 0
+    for(i in 1:K){m_in = m_in + 0.5*nc[i]*(nc[i]-1)}
+    m_out = m - m_in
+    
+    e2d2 = Xin/m_in - Xout/m_out
+    
+    run = T
+    iter = 1
+    while(run && iter < max.iter){
+      run = F
+      # Randomize node order
+      node.order = sample(1:n)
+      for(i in node.order){
+        
+        #Find community neighbors of node i
+        neighs = sample(unique(comm[as.logical(A[i,])]))
+        e2d2_hold = numeric(length(neighs))
+        
+        # Compute change in e2d2 for all neighboring communities
+        Xlost = sum(A[i, comm==comm[i]])
+        m_in_lost = nc[comm[i]] - 1
+        
+        apply.fun2 <- function(j){
+          # Swap community of node i
+          Xin_i = Xin - Xlost + sum(A[i, comm==neighs[j]])
+          Xout_i = M - Xin_i
+          
+          m_in_i = m_in - m_in_lost + nc[neighs[j]] - 1*(neighs[j]==comm[i])
+          m_out_i = m - m_in_i
+          
+          return(Xin_i/m_in_i - Xout_i/m_out_i)
+        }
+        
+        e2d2_hold <- unlist(lapply(1:length(neighs), apply.fun2))
+        
+        # for(j in 1:length(neighs)){
+        #   # Swap community of node i
+        #   Xin_i = Xin - Xlost + sum(A[i, comm==neighs[j]])
+        #   Xout_i = M - Xin_i
+        # 
+        #   m_in_i = m_in - m_in_lost + nc[neighs[j]] - 1*(neighs[j]==comm[i])
+        #   m_out_i = m - m_in_i
+        # 
+        #   e2d2_hold[j] <- Xin_i/m_in_i - Xout_i/m_out_i
+        # 
+        # }
+        
+        # Swap node to whichever community yields largest e2d2 and update values
+        ck = neighs[which.max(e2d2_hold)]
+        
+        if(length(ck)==0){
+          ck = comm[i]
+        }
+        
+        Xin = Xin - Xlost + sum(A[i, comm==ck])
+        Xout = M - Xin
+        
+        m_in = m_in - m_in_lost + nc[ck] - 1*(ck==comm[i])
+        m_out = m - m_in
+        
+        e2d2 <-  Xin/m_in - Xout/m_out
+        nc[comm[i]] = nc[comm[i]] - 1
+        nc[ck]      = nc[ck] + 1
+        comm[i] <- ck
+        
+        
+        
+      }
+      
+      
+      
+      # Stop if no labels updated
+      if(sum(comm==comm_old) < n){
+        run = T
+        comm_old = comm
+      }
+      
+      iter = iter + 1
+      
+    }
+    
+    return(c(comm, e2d2/(M/(n*(n-1)/2))/K ))
+  }
+  
+  out <- lapply(1:runs, apply.fun)
+  
+  # Keep run with max e2d2
+  e2d2_vec <- numeric(runs)
+  for(i in 1:runs){
+    e2d2_vec[i] <- out[[i]][n+1]
+  }
+  
+  keeper = which.max(e2d2_vec)
+  
+  return(list(e2d2=out[[keeper]][n+1], comm=out[[keeper]][1:n]))
+  
+}
+
+# Compute test statistic
+test.stat <- function(A, C){
+  n = dim(A)[1]
+  
+  K = length(unique(C))
+  
+  if (K == 1 || K == n) {
+    
+    return(-1)
+    
+  }
+  
+  
+  P = choose(n,2)
+  P.in <- 0
+  for(i in 1:K){P.in = P.in + choose(length(C[[i]]),2)} 
+  P.out = P-P.in
+  
+  m.in <- 0
+  for(i in 1:K){m.in = m.in + sum(A[C[[i]],C[[i]]])/2}
+  m.out <- sum(A)/2-m.in
+  
+  p.in <- m.in/P.in 
+  p.out <- m.out/P.out
+  
+  
+  p.bar <- sum(A)/(n*(n-1))
+  return((p.in - p.out)/p.bar/K)
+  
+  
+}
+
+# Bootstrap p-value
+boot.pval <- function(A, C, nsim, null=c("ER", "CL"), rn=1){
+  #A: observed adjacency matrix
+  #nsim: # iterations
+  #Null: What null hypothesis do you want to compare against?
+  #ER: Erdos-Renyi, CL: Chung-Lu
+  #given community detection algorithm
+  
+  # Compute test statistic
+  ts = test.stat(A, C)
+
+  n = dim(A)[1]
+  
+  if(null=="ER"){
+    p.hat <- sum(A)/(n*(n-1))
+    apply.fun <- function(i, nl){
+      A.hat <- generateA("ER", params=list(n=n, p=p.hat))
+    }
+        
+  }else if(null=="CL"){
+    fit <- eigs(A, 1, which="LM")
+    theta.hat <- abs(as.numeric(fit$vectors * sqrt(fit$values)))
+    theta.hat[theta.hat > 1] <- 1
+    apply.fun <- function(i, nl){
+        theta.boot <- sample(theta.hat, n, replace=T)
+        A.hat <- generateA("ER", list(psi=theta.boot))
+  }
+    
+    # Only keep largest connected component
+    A.graph <- as.undirected(graph.adjacency(A.hat, mode="undirected"))
+    comps <- components(A.graph)
+    big_id <- which.max(comps$csize)
+    v_ids <- V(A.graph)[comps$membership == big_id]
+    A.graph <- induced_subgraph(A.graph, v_ids)
+    A.hat <- as.matrix(as_adjacency_matrix(A.graph))   
+    K <- length(cluster_fast_greedy(A.graph))
+    
+    greedy(A.hat, K, runs=rn)$e2d2
+  }
+  
+  emp.samp <- unlist(mclapply(1:nsim, apply.fun, nl=null, mc.cores = 6))
+  
+  
+  pval <- mean(emp.samp > ts)
+  
+  return(pval)
+}
+
+# Asymptotic cut-off
+asymp.cut.agn <- function(A, C, K=2, g0=0){
+  n = dim(A)[1]
+  
+  ts <- test.stat(A, C)
+  
+  p.hat <- sum(A)/(n*(n-1))
+  eps = 0.0001
+  
+  cutoff = (g0 + (log(K)/n)^(1/2)/p.hat/K) * (1+eps)
+  
+  return(as.numeric(ts > cutoff))
+  
+}
+
+
+
+
+
+
+
+
+
