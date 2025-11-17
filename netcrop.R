@@ -1139,8 +1139,8 @@ netcrop_dcbm <- function(A, K.CAND,
 
 ################################################################################
 ################################################################################
-##ECV with l2, bin.dev, and AUC
-ECV.for.blockmodel <- function (A, max.K, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
+##ECV with l2
+ecv_sbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
                                 dc.est = 2, kappa = NULL) 
 {
   n <- nrow(A)
@@ -1164,62 +1164,118 @@ ECV.for.blockmodel <- function (A, max.K, cv = NULL, B = 3, holdout.p = 0.1, tau
     }
   }
   result <- lapply(holdout.index.list, holdout.evaluation.fast.all, 
-                   A = A, max.K = max.K, tau = tau, dc.est = dc.est, p.sample = 1 - 
+                   A = A, K.CAND = K.CAND, tau = tau, dc.est = dc.est, p.sample = 1 - 
                      holdout.p, kappa = kappa)
-  dc.block.err.mat <- dc.loglike.mat <- bin.dev.mat <- roc.auc.mat <- impute.err.mat <- block.err.mat <- loglike.mat <- matrix(0, 
-                                                                                                                               nrow = B, ncol = max.K)
-  sbm.auc.mat <- dc.auc.mat <- matrix(0, nrow = B, ncol = max.K)
   
+  dc.block.err.mat <- block.err.mat  <- matrix(0,  nrow = B, ncol = length(K.CAND))
+
   no.edge.seq <- rep(0, B)
   Omega.list <- A.list <- Imputed.A.list <- list()
   for (b in 1:B) {
-    impute.err.mat[b, ] <- result[[b]]$impute.sq.err
     block.err.mat[b, ] <- result[[b]]$block.sq.err
-    loglike.mat[b, ] <- result[[b]]$loglike
-    roc.auc.mat[b, ] <- result[[b]]$roc.auc
-    bin.dev.mat[b, ] <- result[[b]]$bin.dev
-    no.edge.seq[b] <- result[[b]]$no.edge
     dc.block.err.mat[b, ] <- result[[b]]$dc.block.sq.err
-    dc.loglike.mat[b, ] <- result[[b]]$dc.loglike
-    
-    sbm.auc.mat[b, ] <- result[[b]]$sbm.auc
-    dc.auc.mat[b, ] <- result[[b]]$dc.auc
+
   }
-  output <- list(impute.err = colMeans(impute.err.mat), l2 = colMeans(block.err.mat), 
-                 dev = colSums(loglike.mat), auc = colMeans(sbm.auc.mat), 
-                 dc.l2 = colMeans(dc.block.err.mat), dc.dev = colSums(dc.loglike.mat),
-                 dc.auc = colMeans(dc.auc.mat),
-                 sse = colMeans(impute.err.mat), auc.mat = roc.auc.mat, 
-                 dev.mat = loglike.mat, l2.mat = block.err.mat, SSE.mat = impute.err.mat, 
-                 auc.mat = sbm.auc.mat,
-                 dc.dev.mat = dc.loglike.mat, dc.l2.mat = dc.block.err.mat,
-                 dc.auc.mat = dc.auc.mat)
-  if (min(output$dev) > min(output$dc.dev)) {
-    dev.model <- paste("DCSBM", which.min(output$dc.dev), 
-                       sep = "-")
-  }
-  else {
-    dev.model <- paste("SBM", which.min(output$dev), sep = "-")
-  }
-  if (min(output$l2) > min(output$dc.l2)) {
-    l2.model <- paste("DCSBM", which.min(output$dc.l2), sep = "-")
-  }
-  else {
-    l2.model <- paste("SBM", which.min(output$l2), sep = "-")
-  }
-  if (min(output$auc) > min(output$dc.auc)) {
-    auc.model <- paste("DCSBM", which.min(output$dc.auc), sep = "-")
-  }
-  else {
-    auc.model <- paste("SBM", which.min(output$auc), sep = "-")
-  }
+  output <- list(l2 = colMeans(block.err.mat), 
+                 dc.l2 = colMeans(dc.block.err.mat))
+  l2.model <- paste("SBM", K.CAND[which.min(output$l2)], sep = "-")
   output$l2.model <- l2.model
-  output$dev.model <- dev.model
-  output$auc.model <- auc.model
   return(output)
 }
 
-holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc.est=1,fast=FALSE,p.sample=1,kappa=NULL){
+ecv_dcbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
+                                dc.est = 2, kappa = NULL) 
+{
+  n <- nrow(A)
+  edge.index <- which(upper.tri(A))
+  edge.n <- length(edge.index)
+  holdout.index.list <- list()
+  if (is.null(cv)) {
+    holdout.n <- floor(holdout.p * edge.n)
+    for (j in 1:B) {
+      holdout.index.list[[j]] <- sample(x = edge.n, size = holdout.n)
+    }
+  }
+  else {
+    sample.index <- sample.int(edge.n)
+    max.fold.num <- ceiling(edge.n/cv)
+    fold.index <- rep(1:cv, each = max.fold.num)[edge.n]
+    cv.index <- fold.index[sample.index]
+    B <- cv
+    for (j in 1:B) {
+      holdout.index.list[[j]] <- which(cv.index == j)
+    }
+  }
+  result <- lapply(holdout.index.list, holdout.evaluation.fast.all, 
+                   A = A, K.CAND = K.CAND, tau = tau, dc.est = dc.est, p.sample = 1 - 
+                     holdout.p, kappa = kappa)
+  dc.block.err.mat <-  matrix(0, nrow = B, ncol = length(K.CAND))
+
+  no.edge.seq <- rep(0, B)
+  Omega.list <- A.list <- Imputed.A.list <- list()
+  for (b in 1:B) {
+    dc.block.err.mat[b, ] <- result[[b]]$dc.block.sq.err
+  }
+  output <- list(dc.l2 = colMeans(dc.block.err.mat))
+
+  l2.model <- paste("DCSBM", K.CAND[which.min(output$dc.l2)], sep = "-")
+
+  output$l2.model <- l2.model
+
+  return(output)
+}
+
+ecv_sbm_dcbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
+                                dc.est = 2, kappa = NULL) 
+{
+  n <- nrow(A)
+  edge.index <- which(upper.tri(A))
+  edge.n <- length(edge.index)
+  holdout.index.list <- list()
+  if (is.null(cv)) {
+    holdout.n <- floor(holdout.p * edge.n)
+    for (j in 1:B) {
+      holdout.index.list[[j]] <- sample(x = edge.n, size = holdout.n)
+    }
+  }
+  else {
+    sample.index <- sample.int(edge.n)
+    max.fold.num <- ceiling(edge.n/cv)
+    fold.index <- rep(1:cv, each = max.fold.num)[edge.n]
+    cv.index <- fold.index[sample.index]
+    B <- cv
+    for (j in 1:B) {
+      holdout.index.list[[j]] <- which(cv.index == j)
+    }
+  }
+  result <- lapply(holdout.index.list, holdout.evaluation.fast.all, 
+                   A = A, K.CAND = K.CAND, tau = tau, dc.est = dc.est, p.sample = 1 - 
+                     holdout.p, kappa = kappa)
+  dc.block.err.mat <- block.err.mat <-  matrix(0, nrow = B, ncol = length(K.CAND))
+
+  no.edge.seq <- rep(0, B)
+  Omega.list <- A.list <- Imputed.A.list <- list()
+  for (b in 1:B) {
+    block.err.mat[b, ] <- result[[b]]$block.sq.err
+    dc.block.err.mat[b, ] <- result[[b]]$dc.block.sq.err
+  }
+  output <- list(l2 = colMeans(block.err.mat), 
+                 dc.l2 = colMeans(dc.block.err.mat), dc.dev = colSums(dc.loglike.mat)
+                 )
+
+  if (min(output$l2) > min(output$dc.l2)) {
+    l2.model <- paste("DCSBM", K.CAND[which.min(output$dc.l2)], sep = "-")
+  }
+  else {
+    l2.model <- paste("SBM", K.CAND[which.min(output$l2)], sep = "-")
+  }
+
+  output$l2.model <- l2.model
+
+  return(output)
+}
+
+holdout.evaluation.fast.all <- function(holdout.index,A,K.CAND,soft=TRUE,tau=0,dc.est=1,fast=FALSE,p.sample=1,kappa=NULL){
   n <- nrow(A)
   edge.index <- which(upper.tri(A))
   edge.n <- length(edge.index)
@@ -1234,16 +1290,17 @@ holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc
   Omega <- which(is.na(A.new))
   non.miss <- which(!is.na(A.new))
   #A.new[non.miss] <- A.new[non.miss] + 0.5
-  SVD.result <- iter.SVD.core.fast.all(A.new,max.K,fast=TRUE,p.sample=p.sample)
-  dc.block.sq.err <-  dc.loglike <- roc.auc <- bin.dev <- block.sq.err <- impute.sq.err <- loglike <- rep(0,max.K)
-  sbm.auc <- dc.auc <- rep(0,max.K)
+  SVD.result <- iter.SVD.core.fast.all(A.new,K.CAND,fast=TRUE,p.sample=p.sample)
+  dc.block.sq.err <-  dc.loglike <- roc.auc <- bin.dev <- block.sq.err <- impute.sq.err <- loglike <- rep(0,length(K.CAND))
+  sbm.auc <- dc.auc <- rep(0,length(K.CAND))
   
-  for(k in 1:max.K){
+  for(ii in 1:length(K.CAND)){
+    k = K.CAND[ii]
     #print(k)
     ##print(fast)
-    tmp.est <- SVD.result[[k]]
+    tmp.est <- SVD.result[[ii]]
     A.approx <- tmp.est$A.thr
-    impute.sq.err[k] <- sum((A.approx[Omega]-A[Omega])^2)
+    impute.sq.err[ii] <- sum((A.approx[Omega]-A[Omega])^2)
     response <- A[edge.index[holdout.index]]#A[Omega]
     predictors <- A.approx[edge.index[holdout.index]]#A.approx[Omega]
     #print("AUC calculation")
@@ -1260,14 +1317,14 @@ holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc
     trunc.predictors <- predictors
     trunc.predictors[predictors>(1-1e-6)] <- 1-1e-6
     trunc.predictors[predictors<1e-6] <- 1e-6
-    bin.dev[k] <- sum((response-trunc.predictors)^2)#-sum(response*log(trunc.predictors)) - sum((1-response)*log(1-trunc.predictors))
+    bin.dev[ii] <- sum((response-trunc.predictors)^2)#-sum(response*log(trunc.predictors)) - sum((1-response)*log(1-trunc.predictors))
     if(k==1){
       pb <- (sum(A.new,na.rm=TRUE)+1)/(sum(!is.na(A.new)) -sum(!is.na(diag(A.new)))+1)
       if(pb < 1e-6) pb <- 1e-6
       if(pb > 1-1e-6) pb <- 1-1e-6
       A.Omega <- A[Omega]
-      block.sq.err[k] <- sum((pb-A[Omega])^2)
-      loglike[k] <- -sum(A.Omega*log(pb)) - sum((1-A.Omega)*log(1-pb))
+      block.sq.err[ii] <- sum((pb-A[Omega])^2)
+      loglike[ii] <- -sum(A.Omega*log(pb)) - sum((1-A.Omega)*log(1-pb))
       
     }
     
@@ -1308,13 +1365,13 @@ holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc
     }
     P.hat <- Theta%*%B%*%t(Theta)
     diag(P.hat) <- 0
-    block.sq.err[k] <- sum((P.hat[Omega]-A[Omega])^2)
+    block.sq.err[ii] <- sum((P.hat[Omega]-A[Omega])^2)
     P.hat.Omega <- P.hat[Omega]
     A.Omega <- A[Omega]
     P.hat.Omega[P.hat.Omega < 1e-6] <- 1e-6
     P.hat.Omega[P.hat.Omega > (1-1e-6)] <- 1-1e-6
-    loglike[k] <- -sum(A.Omega*log(P.hat.Omega)) - sum((1-A.Omega)*log(1-P.hat.Omega))
-    sbm.auc[k] <- AUC(A.Omega, P.hat.Omega) ##SC addition
+    loglike[ii] <- -sum(A.Omega*log(P.hat.Omega)) - sum((1-A.Omega)*log(1-P.hat.Omega))
+    sbm.auc[ii] <- AUC(A.Omega, P.hat.Omega) ##SC addition
     ##print(oc.time() - ptm)
     #### Degree correct model
     V <- U.approx
@@ -1352,14 +1409,14 @@ holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc
         #P.hat <- diag(phi)%*%matrix(B,n,n)%*%diag(phi)
         diag(P.hat) <- 0
       }
-      dc.block.sq.err[k] <- sum((pb-A[Omega])^2)
+      dc.block.sq.err[ii] <- sum((pb-A[Omega])^2)
       P.hat.Omega <- P.hat[Omega]
       A.Omega <- A[Omega]
       P.hat.Omega[P.hat.Omega < 1e-6] <- 1e-6
       P.hat.Omega[P.hat.Omega > (1-1e-6)] <- 1-1e-6
       
-      dc.loglike[k] <- -sum(A.Omega*log(P.hat.Omega)) - sum((1-A.Omega)*log(1-P.hat.Omega))
-      dc.auc[k] <- AUC(A.Omega, P.hat.Omega)
+      dc.loglike[ii] <- -sum(A.Omega*log(P.hat.Omega)) - sum((1-A.Omega)*log(1-P.hat.Omega))
+      dc.auc[ii] <- AUC(A.Omega, P.hat.Omega)
       
       
     }else{
@@ -1387,13 +1444,13 @@ holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc
         #P.hat <- diag(phi)%*%Theta%*%B%*%t(Theta)%*%diag(phi)
         diag(P.hat) <- 0
       }
-      dc.block.sq.err[k] <- sum((P.hat[Omega]-A[Omega])^2)
+      dc.block.sq.err[ii] <- sum((P.hat[Omega]-A[Omega])^2)
       P.hat.Omega <- P.hat[Omega]
       A.Omega <- A[Omega]
       P.hat.Omega[P.hat.Omega < 1e-6] <- 1e-6
       P.hat.Omega[P.hat.Omega > (1-1e-6)] <- 1-1e-6
-      dc.loglike[k] <- -sum(A.Omega*log(P.hat.Omega)) - sum((1-A.Omega)*log(1-P.hat.Omega))
-      dc.auc[k] <- AUC(A.Omega, P.hat.Omega)
+      dc.loglike[ii] <- -sum(A.Omega*log(P.hat.Omega)) - sum((1-A.Omega)*log(1-P.hat.Omega))
+      dc.auc[ii] <- AUC(A.Omega, P.hat.Omega)
     }
     ###print(oc.time() - ptm)
     
@@ -1404,7 +1461,7 @@ holdout.evaluation.fast.all <- function(holdout.index,A,max.K,soft=TRUE,tau=0,dc
               sbm.auc = sbm.auc, dc.auc = dc.auc))
 }
 
-iter.SVD.core.fast.all <- function(A,Kmax,tol=1e-5,max.iter=100,sparse=TRUE,init=NULL,verbose=FALSE,tau=0,fast=FALSE,p.sample=1){
+iter.SVD.core.fast.all <- function(A,K.CAND,tol=1e-5,max.iter=100,sparse=TRUE,init=NULL,verbose=FALSE,tau=0,fast=FALSE,p.sample=1){
   if(sparse) A <- Matrix(A,sparse=TRUE)
   avg.p <- mean(as.numeric(A),na.rm=TRUE)
   cap <- 1#kappa*avg.p
@@ -1412,10 +1469,11 @@ iter.SVD.core.fast.all <- function(A,Kmax,tol=1e-5,max.iter=100,sparse=TRUE,init
   A <- A/p.sample
   #svd.new <- svd(A,nu=K,nv=K)
   ##print("begin SVD")
-  svd.new <- irlba(A,nu=Kmax,nv=Kmax)
+  svd.new <- irlba(A,nu=max(K.CAND),nv=max(K.CAND))
   ##print("end SVD")
   result <- list()
-  for(K in 1:Kmax){
+  for(ii in 1:length(K.CAND)){
+    K = K.CAND[ii]
     #print(K)
     if(K==1){
       A.new <- svd.new$d[1]*matrix(svd.new$u[,1],ncol=1)%*%t(matrix(svd.new$v[,1],ncol=1))
@@ -1427,10 +1485,12 @@ iter.SVD.core.fast.all <- function(A,Kmax,tol=1e-5,max.iter=100,sparse=TRUE,init
     A.new.thr[A.new >cap] <- cap
     
     tmp.SVD <- list(u=svd.new$u[,1:K],v=svd.new$v[,1:K],d=svd.new$d[1:K])
-    result[[K]] <- list(iter=NA,SVD=tmp.SVD,A=A.new,err.seq=NA,A.thr=A.new.thr)
+    result[[ii]] <- list(iter=NA,SVD=tmp.SVD,A=A.new,err.seq=NA,A.thr=A.new.thr)
   }
   return(result)
 }
+
+
 
 ################################################################################
 ################################################################################
