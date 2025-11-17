@@ -234,15 +234,14 @@ AUC <- function(A, P){
 
 ################################################################################
 
-croissant.blockmodel <- function(A, K.CAND,
+# Only considers one null and alternative model (coincides with e-value method)
+netcrop_sbm_dcbm <- function(A, K.CAND,
                                  s, o, R, 
                                  tau = 0,
                                  laplace = F,
                                  dc.est = 2,
                                  loss = c("l2", "bin.dev", "AUC"),
                                  ncore = 1){
-  
-  if(length(K.CAND) == 1) K.CAND <- 1:K.CAND
   
   K.max <- max(K.CAND)
   
@@ -576,6 +575,567 @@ croissant.blockmodel <- function(A, K.CAND,
   return(c(list('loss' = obj), 
            obj2))
 }
+
+netcrop_sbm <- function(A, K.CAND,
+                                 s, o, R, 
+                                 tau = 0,
+                                 laplace = F,
+                                 dc.est = 2,
+                                 loss = c("l2", "bin.dev", "AUC"),
+                                 ncore = 1){
+  
+  if(length(K.CAND) == 1) K.CAND <- 1:K.CAND
+  
+  K.max <- max(K.CAND)
+  
+  n <- nrow(A)
+  m <- (n-o)/s
+  
+  L <- list()
+  
+  mod <- c("SBM")
+  #mod <- mod.cand
+  
+  over <- lapply(1:R, function(ii) sample.int(n, o, F))
+  non.over <- lapply(1:R, function(ii) sample((1:n)[-over[[ii]]], n-o, replace = F))
+  
+  raw.ind <- cbind(rep(1:R, each = s), rep(1:s, R))
+  
+  raw.out <- mclapply(1:nrow(raw.ind), function(ii){
+    
+    q <- raw.ind[ii, 2]
+    r <- raw.ind[ii, 1]
+    
+    sonn <- c(over[[r]], non.over[[r]][((q-1)*m+1):(q*m)])
+    A.sonn <- A[sonn, sonn]
+    
+    deg <- rowSums(A.sonn)
+    avg.deg <- mean(deg)
+    
+    A.sonn.tau <- A.sonn + tau*avg.deg/n
+    d.sonn.tau <- sparseMatrix( i = 1:(o+m), j = 1:(o+m),
+                                x = 1/sqrt(deg + tau*avg.deg))
+    
+    
+    L.sonn <- A.sonn.tau
+    if(laplace){
+      L.sonn <- tcrossprod(crossprod(d.sonn.tau, A.sonn.tau), d.sonn.tau)
+      L.sonn[is.na(L.sonn)] <- 0
+    }
+    
+    
+    #eig.max <- eigs_sym(L.sonn, K.max, "LM")$vectors
+    eig.max <- irlba::partial_eigen(x = L.sonn, n = K.max, 
+                                    symmetric = T)$vectors
+    
+    out.SBM <- list()
+    #psi.hat <- list()
+    
+    for(k.cand in seq_along(K.CAND)){
+      if(K.CAND[k.cand] == 1){
+        out.SBM[[k.cand]] <- rep(1,o+m)
+        next
+      }
+      
+      work.K <- K.CAND[[k.cand]]
+      # out.SBM[[k.cand]] <- as.integer(kmeans(eig.max[,1:work.K],
+      #                                        work.K,
+      #                                        nstart = 100,
+      #                                        iter.max = 10000)$cluster)
+      out.SBM[[k.cand]] <- as.integer(pam(eig.max[,1:work.K], work.K,
+                                          metric = "euclidean",
+                                          do.swap = F,
+                                          cluster.only = T,
+                                          pamonce = 6))
+      
+      #psi.hat[[k.cand]] <- sqrt(rowSums(eig.max[,1:work.K]^2))
+    }
+    # if(dc.est == 2){
+    #   return(list('SBM' = out.SBM, 'DCBM' = out.DCBM))
+    # }
+    
+    return(list('SBM' = out.SBM))
+    # 'psi' = psi.hat))
+  },
+  mc.cores = ncore)
+  
+  K.size <- length(K.CAND)
+  
+  est.out <- mclapply(1:(K.size*nrow(raw.ind)), function(ii){
+    
+    k.cand <- ii %% K.size
+    k.cand <- ifelse(k.cand == 0, K.size, k.cand)
+    
+    rot <- ceiling(ii / K.size)
+    
+    q <- raw.ind[rot, 2]
+    r <- raw.ind[rot, 1]
+    
+    #message(paste0("Est. at s=",q, " started"))
+    sonn <- c(over[[r]], non.over[[r]][((q-1)*m+1):(q*m)])
+    A.sonn <- A[sonn, sonn]
+    
+    out.SBM.std <- raw.out[raw.ind[,1] == r][[1]]$SBM[[k.cand]]
+    out.SBM <- raw.out[raw.ind[,1] == r][[q]]$SBM[[k.cand]]
+
+    
+    work.K <- K.CAND[[k.cand]]
+    
+    if(work.K == 1){
+      mat.SBM <- rep(1, m)
+      
+      B.SBM <- fast.SBM.est(A.sonn, rep(1,o+m), o+m, 1)
+      mat.SBM <- rep(1, m)
+
+      return(list('gSBM' = mat.SBM,
+                  'BSBM' = B.SBM))
+    }
+    
+    E.SBM.kc <- best.perm.label.match(out.SBM[1:o], 
+                                      out.SBM.std[1:o],
+                                      o, work.K)
+    
+    tmp.SBM <- sparseMatrix(i = 1:(o+m), j = out.SBM, 
+                            dims = c((o+m),work.K))
+    
+    mat.SBM <- as.vector(tcrossprod(tcrossprod(tmp.SBM, E.SBM.kc),
+                                    rbind(1:work.K)))
+    
+    
+    
+    B.SBM <- fast.SBM.est(A.sonn, mat.SBM, o+m, work.K)
+    mat.SBM <- mat.SBM[-(1:o)]
+    
+    
+    message(paste0("Est. at s=",q, " finished"))
+    
+    return(list('gSBM' = mat.SBM,
+                'BSBM' = B.SBM))
+  },
+  mc.cores = ncore)
+  
+  g.SBM <- list()
+  B.SBM <- list()
+  
+  raw.mat <- cbind(raw.ind[rep(1:nrow(raw.ind), each = K.size), ], 
+                   rep(1:K.size, nrow(raw.ind)))
+  
+  for(r in 1:R){
+    g.SBM[[r]] <- list()
+    B.SBM[[r]] <- list()
+    for(k.cand in seq_along(K.CAND)){
+      tmp.est <- est.out[which(raw.mat[,3] == k.cand & raw.mat[,1] == r)]
+      B.SBM[[r]][[k.cand]] <- 0
+      
+      g.SBM[[r]][[k.cand]] <- list()
+      
+      for(q in 1:s){
+        B.SBM[[r]][[k.cand]] <- B.SBM[[r]][[k.cand]] + 
+          tmp.est[[q]]$BSBM/s
+        
+        g.SBM[[r]][[k.cand]][[q]] <- tmp.est[[q]]$gSBM
+      }
+    }
+  }
+  
+  non.size <- s*(s-1)/2
+  non.mat <- matrix(nrow = R*non.size*K.size, ncol = 4)
+  cc <- 1
+  for(r in 1:R)
+    for(k.cand in seq_along(K.CAND))
+      for(p in 1:(s-1))
+        for(q in (p+1):s){
+          non.mat[cc, ] <- c(r, k.cand, p, q)
+          cc <- cc + 1
+        }
+  
+  L.all <- mclapply(1:nrow(non.mat), function(ii){
+    r <- non.mat[ii, 1]
+    k.cand <- non.mat[ii, 2]
+    p <- non.mat[ii, 3]
+    q <- non.mat[ii, 4]
+    
+    p.non <- non.over[[r]][((p-1)*m+1):(p*m)]
+    q.non <- non.over[[r]][((q-1)*m+1):(q*m)]
+    
+    A.non <- A[p.non, q.non]
+    
+    L.temp <- matrix(0, nrow = 2*length(loss), ncol = 1)
+    row.names(L.temp) <- paste(rep(mod, each = length(loss)), rep(loss, 2), 
+                               sep = "_")
+    colnames(L.temp) <- as.character(K.CAND[k.cand])
+    
+    
+    P.SBM <- B.SBM[[r]][[k.cand]][g.SBM[[r]][[k.cand]][[p]],
+                                  g.SBM[[r]][[k.cand]][[q]] ]
+    
+    
+    for(mq in seq_along(mod)){
+      if(mod[mq] == "SBM"){
+        for(lq in seq_along(loss)){
+          tmp.nm <- paste(mod[mq], loss[lq], sep = "_")
+          L.temp[tmp.nm, 1] <-  L.temp[tmp.nm, 1] +
+            do.call(loss[lq], list(as.numeric(A.non), P.SBM))/(s*(s-1)*0.5) 
+        }
+        next}
+      else{
+        for(lq in seq_along(loss)){
+          tmp.nm <- paste(mod[mq], loss[lq], sep = "_")
+          L.temp[tmp.nm, 1] <-  L.temp[tmp.nm, 1] +
+            do.call(loss[lq], list(as.numeric(A.non), P.DCBM))/(s*(s-1)*0.5)
+        }
+      }
+    }
+    #}
+    return(L.temp)},
+    mc.cores = ncore)
+  
+  for(r in 1:R){
+    L[[r]] <- do.call('cbind', lapply(1:K.size, function(kk){
+      Reduce('+', L.all[which(non.mat[,2] == kk & non.mat[,1] == r)])
+    }))
+    
+    row.names(L[[r]]) <- paste(rep(mod, each = length(loss)), rep(loss, 2), 
+                               sep = "_")
+    colnames(L[[r]]) <- as.character(K.CAND)
+  }
+  
+  obj <- data.table(`Candidate Model` = rep(mod, length(K.CAND)),
+                    `Candidate Value` = rep(K.CAND, each = 1)
+  )
+  
+  
+  for(lq in seq_along(loss))
+    for(r in 1:R){
+      obj[[paste0(loss[lq], "-Rep=", r)]] <- 
+        as(rbind(L[[r]][paste0("SBM_",loss[lq]), ]), "vector")
+    }
+  
+  obj2 <- list()
+  
+  obj2[["Candidate Models"]] <- "SBM"
+  
+  obj2[["Candidate Values"]] <- K.CAND
+  
+  for(lq in seq_along(loss)){
+    
+    obj2[[paste0("Mod.K.hat.each.rep (", loss[lq], ")")]] <- sapply(1:R, function(r){
+      l.sbm <- min(L[[r]][paste0("SBM_", loss[lq]),])
+      paste0("SBM-",K.CAND[which.min(L[[r]][paste0("SBM_", loss[lq]),])])
+    })
+    
+    obj2[[paste0(loss[lq], ".model")]] <- 
+      modal(obj2[[paste0("Mod.K.hat.each.rep (", loss[lq], ")")]])
+  }
+  
+  return(c(list('loss' = obj), 
+           obj2))
+}
+
+netcrop_dcbm <- function(A, K.CAND,
+                                 s, o, R, 
+                                 tau = 0,
+                                 laplace = F,
+                                 dc.est = 2,
+                                 loss = c("l2", "bin.dev", "AUC"),
+                                 ncore = 1){
+  
+  if(length(K.CAND) == 1) K.CAND <- 1:K.CAND
+  
+  K.max <- max(K.CAND)
+  
+  n <- nrow(A)
+  m <- (n-o)/s
+  
+  L <- list()
+  
+  mod <- c("DCBM")
+  #mod <- mod.cand
+  
+  over <- lapply(1:R, function(ii) sample.int(n, o, F))
+  non.over <- lapply(1:R, function(ii) sample((1:n)[-over[[ii]]], n-o, replace = F))
+  
+  raw.ind <- cbind(rep(1:R, each = s), rep(1:s, R))
+  
+  raw.out <- mclapply(1:nrow(raw.ind), function(ii){
+    
+    q <- raw.ind[ii, 2]
+    r <- raw.ind[ii, 1]
+    
+    sonn <- c(over[[r]], non.over[[r]][((q-1)*m+1):(q*m)])
+    A.sonn <- A[sonn, sonn]
+    
+    deg <- rowSums(A.sonn)
+    avg.deg <- mean(deg)
+    
+    A.sonn.tau <- A.sonn + tau*avg.deg/n
+    d.sonn.tau <- sparseMatrix( i = 1:(o+m), j = 1:(o+m),
+                                x = 1/sqrt(deg + tau*avg.deg))
+    
+    
+    L.sonn <- A.sonn.tau
+    if(laplace){
+      L.sonn <- tcrossprod(crossprod(d.sonn.tau, A.sonn.tau), d.sonn.tau)
+      L.sonn[is.na(L.sonn)] <- 0
+    }
+    
+    
+    #eig.max <- eigs_sym(L.sonn, K.max, "LM")$vectors
+    eig.max <- irlba::partial_eigen(x = L.sonn, n = K.max, 
+                                    symmetric = T)$vectors
+    
+    out.DCBM <- list()
+    #psi.hat <- list()
+    
+    for(k.cand in seq_along(K.CAND)){
+      
+      work.K <- K.CAND[[k.cand]]
+      # out.SBM[[k.cand]] <- as.integer(kmeans(eig.max[,1:work.K],
+      #                                        work.K,
+      #                                        nstart = 100,
+      #                                        iter.max = 10000)$cluster)
+      
+      #psi.hat[[k.cand]] <- sqrt(rowSums(eig.max[,1:work.K]^2))
+      if(work.K==1){
+        rownorm <- sqrt(eig.max[,1]^2)
+      }else{
+        rownorm <- sqrt(rowSums(eig.max[, 1:work.K]^2))
+      }
+
+      rownorm[rownorm == 0] <- 1
+      
+      rn.eig <- eig.max[,1:work.K]/rownorm
+      
+      out.DCBM[[k.cand]] <- as.integer(pam(rn.eig, work.K,
+                                           metric = "euclidean",
+                                           do.swap = F,
+                                           cluster.only = T,
+                                           pamonce = 6))
+      
+      # out.DCBM[[k.cand]] <- as.integer(kmeans(rn.eig, work.K,
+      #                                         nstart = 100,
+      #                                         iter.max = 10^7)$cluster)
+    }
+    # if(dc.est == 2){
+    #   return(list('SBM' = out.SBM, 'DCBM' = out.DCBM))
+    # }
+    
+    return(list('DCBM' = out.DCBM))
+    # 'psi' = psi.hat))
+  },
+  mc.cores = ncore)
+  
+  K.size <- length(K.CAND)
+  
+  est.out <- mclapply(1:(K.size*nrow(raw.ind)), function(ii){
+    
+    k.cand <- ii %% K.size
+    k.cand <- ifelse(k.cand == 0, K.size, k.cand)
+    
+    rot <- ceiling(ii / K.size)
+    
+    q <- raw.ind[rot, 2]
+    r <- raw.ind[rot, 1]
+    
+    #message(paste0("Est. at s=",q, " started"))
+    sonn <- c(over[[r]], non.over[[r]][((q-1)*m+1):(q*m)])
+    A.sonn <- A[sonn, sonn]
+    
+    out.DCBM.std <- raw.out[raw.ind[,1] == r][[1]]$DCBM[[k.cand]]
+    
+    out.DCBM <- raw.out[raw.ind[,1] == r][[q]]$DCBM[[k.cand]]
+    
+    
+    work.K <- K.CAND[[k.cand]]
+    
+    if(work.K == 1){
+      mat.DCBM <- rep(1, m)
+      
+      
+      if(dc.est == 2){
+        tmp <- fast.DCBM.est(A.sonn, rep(1,o+m), o+m, 1, o,
+                             p.sample = 1)
+      }else{
+        #psi.hat <- raw.out[raw.ind[,1] == r][[q]]$psi[[k.cand]]
+        tmp <- eigen.DCBM.est(A.sonn, rep(1,o+m), o+m, 1, o,
+                              p.sample = 1)
+      }
+      
+      B.DCBM <- tmp$Bsum
+      psi.DCBM <- tmp$psi
+      mat.DCBM <- rep(1, m)
+      
+      return(list(
+                  'gDCBM' = mat.DCBM,
+                  'BDCBM' = B.DCBM,
+                  'psiDCBM' = psi.DCBM))
+    }
+    
+    
+    E.DCBM.kc <- best.perm.label.match(out.DCBM[1:o], 
+                                       out.DCBM.std[1:o],
+                                       o, work.K)
+    
+    
+    tmp.DCBM <- sparseMatrix(i = 1:(o+m), j = out.DCBM, 
+                             dims = c((o+m),work.K))
+    
+    
+    mat.DCBM <- as.vector(tcrossprod(tcrossprod(tmp.DCBM, E.DCBM.kc),
+                                     rbind(1:work.K)))
+    
+    
+    if(dc.est == 2){
+      tmp <- fast.DCBM.est(A.sonn, mat.DCBM, o+m, work.K, o, 
+                           p.sample = 1)
+    }else{
+      #psi.hat <- raw.out[raw.ind[,1] == r][[q]]$psi[[k.cand]]
+      tmp <- eigen.DCBM.est(A.sonn, mat.DCBM, o+m, work.K, o, 
+                            p.sample = 1)
+    }
+    
+    B.DCBM <- tmp$Bsum
+    psi.DCBM <- tmp$psi
+    mat.DCBM <- mat.DCBM[-(1:o)]
+    
+    message(paste0("Est. at s=",q, " finished"))
+    
+    return(list(
+                'gDCBM' = mat.DCBM,
+                'BDCBM' = B.DCBM,
+                'psiDCBM' = psi.DCBM))
+  },
+  mc.cores = ncore)
+  
+  g.DCBM <- list()
+  B.DCBM <- list()
+  psi.DCBM <- list()
+  
+  raw.mat <- cbind(raw.ind[rep(1:nrow(raw.ind), each = K.size), ], 
+                   rep(1:K.size, nrow(raw.ind)))
+  
+  for(r in 1:R){
+    g.DCBM[[r]] <- list()
+    B.DCBM[[r]] <- list()
+    psi.DCBM[[r]] <- list()
+    for(k.cand in seq_along(K.CAND)){
+      tmp.est <- est.out[which(raw.mat[,3] == k.cand & raw.mat[,1] == r)]
+      B.DCBM[[r]][[k.cand]] <- 0
+      
+      g.DCBM[[r]][[k.cand]] <- list()
+      psi.DCBM[[r]][[k.cand]] <- list()
+      
+      for(q in 1:s){
+        B.DCBM[[r]][[k.cand]] <- B.DCBM[[r]][[k.cand]] + 
+          tmp.est[[q]]$BDCBM/s
+        
+        g.DCBM[[r]][[k.cand]][[q]] <- tmp.est[[q]]$gDCBM
+        psi.DCBM[[r]][[k.cand]][[q]] <- tmp.est[[q]]$psiDCBM
+      }
+    }
+  }
+  
+  non.size <- s*(s-1)/2
+  non.mat <- matrix(nrow = R*non.size*K.size, ncol = 4)
+  cc <- 1
+  for(r in 1:R)
+    for(k.cand in seq_along(K.CAND))
+      for(p in 1:(s-1))
+        for(q in (p+1):s){
+          non.mat[cc, ] <- c(r, k.cand, p, q)
+          cc <- cc + 1
+        }
+  
+  L.all <- mclapply(1:nrow(non.mat), function(ii){
+    r <- non.mat[ii, 1]
+    k.cand <- non.mat[ii, 2]
+    p <- non.mat[ii, 3]
+    q <- non.mat[ii, 4]
+    
+    p.non <- non.over[[r]][((p-1)*m+1):(p*m)]
+    q.non <- non.over[[r]][((q-1)*m+1):(q*m)]
+    
+    A.non <- A[p.non, q.non]
+    
+    L.temp <- matrix(0, nrow = 2*length(loss), ncol = 1)
+    row.names(L.temp) <- paste(rep(mod, each = length(loss)), rep(loss, 2), 
+                               sep = "_")
+    colnames(L.temp) <- as.character(K.CAND[k.cand])
+
+    
+    P.DCBM <- B.DCBM[[r]][[k.cand]][g.DCBM[[r]][[k.cand]][[p]],
+                                    g.DCBM[[r]][[k.cand]][[q]] ] *
+      tcrossprod(psi.DCBM[[r]][[k.cand]][[p]],
+                 psi.DCBM[[r]][[k.cand]][[q]])
+    
+    P.DCBM[P.DCBM < 1e-6] <- 1e-6
+    P.DCBM[P.DCBM > 1- 1e-6] <- 1 - 1e-6
+    
+    for(mq in seq_along(mod)){
+      if(mod[mq] == "SBM"){
+        for(lq in seq_along(loss)){
+          tmp.nm <- paste(mod[mq], loss[lq], sep = "_")
+          L.temp[tmp.nm, 1] <-  L.temp[tmp.nm, 1] +
+            do.call(loss[lq], list(as.numeric(A.non), P.SBM))/(s*(s-1)*0.5) 
+        }
+        next}
+      else{
+        for(lq in seq_along(loss)){
+          tmp.nm <- paste(mod[mq], loss[lq], sep = "_")
+          L.temp[tmp.nm, 1] <-  L.temp[tmp.nm, 1] +
+            do.call(loss[lq], list(as.numeric(A.non), P.DCBM))/(s*(s-1)*0.5)
+        }
+      }
+    }
+    #}
+    return(L.temp)},
+    mc.cores = ncore)
+  
+  for(r in 1:R){
+    L[[r]] <- do.call('cbind', lapply(1:K.size, function(kk){
+      Reduce('+', L.all[which(non.mat[,2] == kk & non.mat[,1] == r)])
+    }))
+    
+    row.names(L[[r]]) <- paste(rep(mod, each = length(loss)), rep(loss, 2), 
+                               sep = "_")
+    colnames(L[[r]]) <- as.character(K.CAND)
+  }
+  
+  obj <- data.table(`Candidate Model` = rep(mod, length(K.CAND)),
+                    `Candidate Value` = rep(K.CAND, each = 1)
+  )
+  
+  
+  for(lq in seq_along(loss))
+    for(r in 1:R){
+      obj[[paste0(loss[lq], "-Rep=", r)]] <- 
+        as(rbind(
+                 L[[r]][paste0("DCBM_",loss[lq]), ]), "vector")
+    }
+  
+  obj2 <- list()
+  
+  obj2[["Candidate Models"]] <- "DCBM"
+  
+  obj2[["Candidate Values"]] <- K.CAND
+  
+  for(lq in seq_along(loss)){
+    
+    obj2[[paste0("Mod.K.hat.each.rep (", loss[lq], ")")]] <- sapply(1:R, function(r){
+      l.dcbm <- min(L[[r]][paste0("DCBM_", loss[lq]),])
+      paste0("DCSBM-",K.CAND[which.min(L[[r]][paste0("DCBM_", loss[lq]),])])
+    })
+    
+    
+    obj2[[paste0(loss[lq], ".model")]] <- 
+      modal(obj2[[paste0("Mod.K.hat.each.rep (", loss[lq], ")")]])
+  }
+  
+  return(c(list('loss' = obj), 
+           obj2))
+}
+
+
 
 ################################################################################
 ################################################################################
@@ -1187,7 +1747,7 @@ croissant.rdpg <- function(A, d.cand, s, o, R,
     
     eig <- irlba::irlba(L.sonn, nv = dmax)
     U <- eig$v
-    sigma.half <- diag(sqrt(abs(eig$d)))
+    sigma.half <- diag(sqrt(abs(eig$d))) # I think this will give an error when dmax = 1 (as the matrix will be ones on diagonal)
     
     X.sonn <- tcrossprod(U, sigma.half)
     
