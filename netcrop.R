@@ -235,6 +235,7 @@ AUC <- function(A, P){
 ################################################################################
 
 # Only considers one null and alternative model (coincides with e-value method)
+# Sims code catches errors so entire simulation doesn't die...
 netcrop_sbm_dcbm <- function(A, K.CAND,
                                  s, o, R, 
                                  tau = 0,
@@ -576,6 +577,30 @@ netcrop_sbm_dcbm <- function(A, K.CAND,
            obj2))
 }
 
+netcrop_sbm_dcbm_sims <- function(A, K.CAND,
+                             s, o, R, 
+                             tau = 0,
+                             laplace = F,
+                             dc.est = 2,
+                             loss = c("l2", "bin.dev", "AUC"),
+                             ncore = 1){
+  
+  err <- try(netcrop_sbm_dcbm(A, K.CAND,
+                              s, o, R, 
+                              tau,
+                              laplace,
+                              dc.est,
+                              loss,
+                              ncore ),TRUE)
+  
+  if(class(err)=="try-error"){
+    return(NA)
+  }else{
+    return(err$l2.model)
+  }
+  
+}
+
 netcrop_sbm <- function(A, K.CAND,
                                  s, o, R, 
                                  tau = 0,
@@ -830,6 +855,30 @@ netcrop_sbm <- function(A, K.CAND,
   
   return(c(list('loss' = obj), 
            obj2))
+}
+
+netcrop_sbm_sims <- function(A, K.CAND,
+                                  s, o, R, 
+                                  tau = 0,
+                                  laplace = F,
+                                  dc.est = 2,
+                                  loss = c("l2", "bin.dev", "AUC"),
+                                  ncore = 1){
+  
+  err <- try(netcrop_sbm(A, K.CAND,
+                              s, o, R, 
+                              tau,
+                              laplace,
+                              dc.est,
+                              loss,
+                              ncore ),TRUE)
+  
+  if(class(err)=="try-error"){
+    return(NA)
+  }else{
+    return(err$l2.model)
+  }
+  
 }
 
 netcrop_dcbm <- function(A, K.CAND,
@@ -1135,7 +1184,29 @@ netcrop_dcbm <- function(A, K.CAND,
            obj2))
 }
 
-
+netcrop_dcbm_sims <- function(A, K.CAND,
+                                  s, o, R, 
+                                  tau = 0,
+                                  laplace = F,
+                                  dc.est = 2,
+                                  loss = c("l2", "bin.dev", "AUC"),
+                                  ncore = 1){
+  
+  err <- try(netcrop_dcbm(A, K.CAND,
+                              s, o, R, 
+                              tau,
+                              laplace,
+                              dc.est,
+                              loss,
+                              ncore ),TRUE)
+  
+  if(class(err)=="try-error"){
+    return(NA)
+  }else{
+    return(err$l2.model)
+  }
+  
+}
 
 ################################################################################
 ################################################################################
@@ -1183,6 +1254,20 @@ ecv_sbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0,
   return(output)
 }
 
+ecv_sbm_sims <- function(A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
+                     dc.est = 2, kappa = NULL){
+  
+  err <- try(ecv_sbm(A, K.CAND, cv, B , holdout.p , tau , 
+                          dc.est, kappa), TRUE)
+  
+  if(class(err)=="try-error"){
+    return(NA)
+  }else{
+    return(err$l2.model)
+  }
+}
+
+
 ecv_dcbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
                                 dc.est = 2, kappa = NULL) 
 {
@@ -1223,6 +1308,19 @@ ecv_dcbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0,
   output$l2.model <- l2.model
 
   return(output)
+}
+
+ecv_dcbm_sims <- function(A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
+                         dc.est = 2, kappa = NULL){
+  
+  err <- try(ecv_dcbm(A, K.CAND, cv, B , holdout.p , tau , 
+                     dc.est, kappa),TRUE)
+  
+  if(class(err)=="try-error"){
+    return(NA)
+  }else{
+    return(err$l2.model)
+  }
 }
 
 ecv_sbm_dcbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
@@ -1275,6 +1373,20 @@ ecv_sbm_dcbm <- function (A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0,
   return(output)
 }
 
+ecv_sbm_dcbm_sims <- function(A, K.CAND, cv = NULL, B = 3, holdout.p = 0.1, tau = 0, 
+                         dc.est = 2, kappa = NULL){
+  
+  err <- try(ecv_sbm_dcbm(A, K.CAND, cv, B , holdout.p , tau , 
+                     dc.est, kappa),TRUE)
+  
+  if(class(err)=="try-error"){
+    return(NA)
+  }else{
+    return(err$l2.model)
+  }
+}
+
+
 holdout.evaluation.fast.all <- function(holdout.index,A,K.CAND,soft=TRUE,tau=0,dc.est=1,fast=FALSE,p.sample=1,kappa=NULL){
   n <- nrow(A)
   edge.index <- which(upper.tri(A))
@@ -1298,7 +1410,7 @@ holdout.evaluation.fast.all <- function(holdout.index,A,K.CAND,soft=TRUE,tau=0,d
     k = K.CAND[ii]
     #print(k)
     ##print(fast)
-    tmp.est <- SVD.result[[ii]]
+    tmp.est <- SVD.result[[k]]
     A.approx <- tmp.est$A.thr
     impute.sq.err[ii] <- sum((A.approx[Omega]-A[Omega])^2)
     response <- A[edge.index[holdout.index]]#A[Omega]
@@ -1472,8 +1584,7 @@ iter.SVD.core.fast.all <- function(A,K.CAND,tol=1e-5,max.iter=100,sparse=TRUE,in
   svd.new <- irlba(A,nu=max(K.CAND),nv=max(K.CAND))
   ##print("end SVD")
   result <- list()
-  for(ii in 1:length(K.CAND)){
-    K = K.CAND[ii]
+  for(K in 1:max(K.CAND)){
     #print(K)
     if(K==1){
       A.new <- svd.new$d[1]*matrix(svd.new$u[,1],ncol=1)%*%t(matrix(svd.new$v[,1],ncol=1))
@@ -1485,7 +1596,7 @@ iter.SVD.core.fast.all <- function(A,K.CAND,tol=1e-5,max.iter=100,sparse=TRUE,in
     A.new.thr[A.new >cap] <- cap
     
     tmp.SVD <- list(u=svd.new$u[,1:K],v=svd.new$v[,1:K],d=svd.new$d[1:K])
-    result[[ii]] <- list(iter=NA,SVD=tmp.SVD,A=A.new,err.seq=NA,A.thr=A.new.thr)
+    result[[K]] <- list(iter=NA,SVD=tmp.SVD,A=A.new,err.seq=NA,A.thr=A.new.thr)
   }
   return(result)
 }
@@ -2477,4 +2588,5 @@ croissant.tune.regsp <- function(A, K, tau.cand,
   return(c(list('loss' = obj), 
            obj2))
 }
+
 

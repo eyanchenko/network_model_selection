@@ -14,7 +14,8 @@ library(dplyr)
 ## Increasing variance of degree parameters
 niter = 100
 n = 1000
-alpha = 0.5
+alpha = 0.25
+
 beta = 0.20
 prop = 0.75
 K = 2
@@ -60,13 +61,13 @@ for(nu in nu.seq){
     
     # Reject if it chooses DCBM with K communities
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-2")
+      rej <- as.numeric(netcrop_sbm_dcbm_sims(A, 2, s=5, o=100, R=1, loss="l2")=="DCSBM-2")
     )[3]
     df$rej[cnt+3] <- rej
     
     # Reject if it chooses DCBM with 2 communities (ECV)
     df$time[cnt+4] <- system.time(
-      rej <- as.numeric(ECV.for.blockmodel(A, 2)$l2.model=="DCSBM-2")
+      rej <- as.numeric(ecv_sbm_dcbm_sims(A, 2)=="DCSBM-2")
     )[3]
     df$rej[cnt+4] <- rej
     
@@ -109,7 +110,7 @@ ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 
 niter = 100
 n = 1000
-alpha = 0.5
+alpha = 0.25
 beta = 0.90
 K = 5
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
@@ -141,15 +142,15 @@ for(nu in nu.seq){
     eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1)
     
     
-    # # E-value with gamma = 0.4
-    # # Reject if e-value is greater than 20.
-    # df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    # df$rej[cnt]  <- rej
-    # 
-    # # E-value with gamma = 0.5
-    # # Reject if e-value is greater than 20.
-    # df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    # df$rej[cnt+1]  <- rej
+    # E-value with gamma = 0.4
+    # Reject if e-value is greater than 20.
+    df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$rej[cnt]  <- rej
+
+    # E-value with gamma = 0.5
+    # Reject if e-value is greater than 20.
+    df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$rej[cnt+1]  <- rej
 
     # E-value with gamma = 0.6
     # Reject if e-value is greater than 20.
@@ -158,13 +159,13 @@ for(nu in nu.seq){
     
     # Reject if it chooses DCBM with K communities
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=5, s=5, o=100, R=1, loss="l2")$l2.model=="DCSBM-5")
+      rej <- as.numeric(netcrop_sbm_dcbm_sims(A, 5, s=5, o=100, R=1, loss="l2")=="DCSBM-5")
     )[3]
     df$rej[cnt+3] <- rej
     
     # Reject if it chooses DCBM with 5 communities (ECV)
     df$time[cnt+4] <- system.time(
-      rej <- as.numeric(ECV.for.blockmodel(A, 5)$l2.model=="DCSBM-2")
+      rej <- as.numeric(ecv_sbm_dcbm_sims(A, 5)=="DCSBM-5")
     )[3]
     df$rej[cnt+4] <- rej
     

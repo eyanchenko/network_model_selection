@@ -12,10 +12,10 @@ library(dplyr)
 ## Setting 1 (a) - H0: SBM w/ K=1 (ER) vs. H1: SBM w/ K=2
 ## Increasing community structure strength
 
-niter = 100
+niter = 200
 n = 1000
-alpha = 0.1
-beta.seq = seq(0.2, 0.6, length=21)
+alpha = 0.05
+beta.seq = seq(0.4, 0.9, length=21)
 delta=0.25
 nreps = 100
 K = 2
@@ -30,14 +30,14 @@ cnt = 1
 for(beta in beta.seq){
   
   B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
-  
   pi = c(delta, 1-delta)
-  C  = sample(1:K, n, TRUE, pi)
+  
   
   for(iter in 1:niter){
     
     df$beta[cnt:(cnt+length(methods)-1)] <- beta
     
+    C  = sample(1:K, n, TRUE, pi)
     params = list(B=B, C=C)
     A <- generateA("SBM", params)
 
@@ -57,26 +57,22 @@ for(beta in beta.seq){
     df$rej[cnt+2]  <- rej
 
     # Reject if it chooses SBM with 2 community (NETCROP)
-    df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="SBM-2")
-    )[3]
+    df$time[cnt+3] <- system.time(rej <- as.numeric(netcrop_sbm_sims(A, c(1,2), s=5, o=100, R=1, loss="l2")=="SBM-2"))[3]
     df$rej[cnt+3] <- rej
     
     # Reject if it chooses SBM with 2 community (ECV)
-    df$time[cnt+4] <- system.time(
-      rej <- as.numeric(ECV.for.blockmodel(A, 2)$l2.model=="SBM-2")
-    )[3]
+    df$time[cnt+4] <- system.time(rej <- as.numeric(ecv_sbm_sims(A, c(1,2))=="SBM-2"))[3]
     df$rej[cnt+4] <- rej
   
     cnt = cnt + length(methods)
 
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta_111725.RData")
 
   }
   print(beta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta_111725.RData")
 
 df_plot <- df %>% group_by(Method, beta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -88,7 +84,7 @@ p1 <- ggplot(df_plot, aes(x=beta, y=rej, color=Method))+
   theme_bw()
 p1
 
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_beta.pdf", height=4, width=6, unit="in")
+ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_beta_111725.pdf", height=4, width=6, unit="in")
 
 p2 <- ggplot(df_plot, aes(x=beta, y=time, color=Method))+
   geom_point()+
@@ -103,11 +99,11 @@ ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 ## Setting 1 (b) - H0: SBM w/ K=1 (ER) vs. H1: SBM w/ K=2
 ## Increasing community size
 
-niter = 100
+niter = 200
 n = 1000
-alpha = 0.1
-beta = 0.4
-delta.seq = seq(0.05, 0.5, length=10)
+alpha = 0.05
+beta = 0.6
+delta.seq = seq(0.01, 0.5, length=20)
 K = 2
 
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
@@ -124,12 +120,12 @@ cnt = 1
 for(delta in delta.seq){
   
   pi = c(delta, 1-delta)
-  C  = sample(1:K, n, TRUE, pi)
   
   for(iter in 1:niter){
     
     df$delta[cnt:(cnt+length(methods)-1)] <- delta
     
+    C  = sample(1:K, n, TRUE, pi)
     params = list(B=B, C=C)
     A <- generateA("SBM", params)
     
@@ -150,28 +146,35 @@ for(delta in delta.seq){
     
     # Reject if it chooses SBM with 2 community
     df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=2, s=5, o=100, R=1, loss="l2")$l2.model=="SBM-2")
+      rej <- as.numeric(netcrop_sbm_sims(A, c(1,2), s=5, o=100, R=1, loss="l2")=="SBM-2")
     )[3]
     df$rej[cnt+3] <- rej
     
     # Reject if it chooses SBM with 2 community (ECV)
-    df$time[cnt+4] <- system.time(
-      rej <- as.numeric(ECV.for.blockmodel(A, 2)$l2.model=="SBM-2")
-    )[3]
+    df$time[cnt+4] <- system.time(rej <- as.numeric(ecv_sbm_sims(A, c(1,2))=="SBM-2"))[3]
     df$rej[cnt+4] <- rej
 
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_111725.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_111725.RData")
 
+df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej), time=mean(time))
+
+p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
+  geom_point()+
+  geom_line()+
+  xlab(expression(delta))+
+  ylab("Rejection Rate")+
+  theme_bw()
+p1
  
 
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_delta.pdf", height=4, width=6, unit="in")
+ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_delta_111725.pdf", height=4, width=6, unit="in")
 
 
 p2 <- ggplot(df_plot, aes(x=delta, y=time, color=Method))+
@@ -188,11 +191,11 @@ ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 ## Setting 1 (c) - H0: SBM w/ K=4 vs. H1: SBM w/ K=5
 ## Increasing community size
 
-niter = 100
+niter = 200
 n = 1000
-alpha = 0.1
+alpha = 0.05
 beta = 0.8
-delta.seq = seq(0.01, 0.20, length=10)
+delta.seq = seq(0.01, 0.20, length=20)
 K = 5
 
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
@@ -209,12 +212,12 @@ cnt = 1
 for(delta in delta.seq){
   
   pi = c(rep(1/(K-1) - delta/(K-1), K-1), delta)
-  C  = sample(1:K, n, TRUE, pi)
   
   for(iter in 1:niter){
     
     df$delta[cnt:(cnt+length(methods)-1)] <- delta
     
+    C  = sample(1:K, n, TRUE, pi)
     params = list(B=B, C=C)
     A <- generateA("SBM", params)
     
@@ -234,25 +237,21 @@ for(delta in delta.seq){
     df$rej[cnt+2]  <- rej
     
     # Reject if it chooses SBM with 5 communities
-    df$time[cnt+3] <- system.time(
-      rej <- as.numeric(croissant.blockmodel(A=A, K.CAND=5, s=5, o=100, R=1, loss="l2")$l2.model=="SBM-5")
-    )[3]
+    df$time[cnt+3] <- system.time(rej <- as.numeric(netcrop_sbm_sims(A, c(4,5), s=5, o=100, R=1, loss="l2")=="SBM-5"))[3]
     df$rej[cnt+3] <- rej
     
     # Reject if it chooses SBM with 5 communities (ECV)
-    df$time[cnt+4] <- system.time(
-      rej <- as.numeric(ECV.for.blockmodel(A, 5)$l2.model=="SBM-5")
-    )[3]
+    df$time[cnt+4] <- system.time(rej <- as.numeric(ecv_sbm_sims(A, c(4,5))=="SBM-5"))[3]
     df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_111725.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_111725.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej), time=mean(time))
 
@@ -263,7 +262,7 @@ p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   ylab("Rejection Rate")+
   theme_bw()
 p1
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K5_delta.pdf", height=4, width=6, unit="in")
+ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K5_delta_111725.pdf", height=4, width=6, unit="in")
 
 
 p2 <- ggplot(df_plot, aes(x=delta, y=time, color=Method))+
