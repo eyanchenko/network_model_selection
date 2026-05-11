@@ -1,7 +1,6 @@
-## Data fission and UI for model selection on networks
-## Eric Yanchenko
-## May 1, 2025
-
+## Paper: Universal inference for model selection on networks
+## Author: Eric Yanchenko
+## Akita International University
 
 source("~/Documents/Research/network_model_selection/netcrop.R")
 source("~/Documents/Research/network_model_selection/functions.R")
@@ -40,7 +39,7 @@ for(beta in beta.seq){
     C  = sample(1:K, n, TRUE, pi)
     params = list(B=B, C=C)
     A <- generateA("SBM", params)
-
+    
     # E-value with gamma = 0.1
     # Reject if e-value is greater than 20.
     df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "ER", "SBM", 2, 2, 0.1, nreps = nreps, ncores = detectCores()-1) > 20))[3]
@@ -163,7 +162,7 @@ for(delta in delta.seq){
 
 load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_111725.RData")
 
-df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej), time=mean(time))
+df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
 p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   geom_point()+
@@ -200,7 +199,7 @@ K = 5
 
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
 
-methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP", "ECV")
+methods = c("e-value0.1", "e-value0.5", "e-value0.9", "NETCROP", "ECV")
 
 df <- tibble(iter = rep(rep(1:niter,each=length(methods)), length(delta.seq)), 
              Method=rep(methods, niter*length(delta.seq)), 
@@ -223,7 +222,7 @@ for(delta in delta.seq){
     
     # E-value with gamma = 0.1
     # Reject if e-value is greater than 20.
-    df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.1, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt]  <- rej
     
     # E-value with gamma = 0.5
@@ -233,7 +232,7 @@ for(delta in delta.seq){
     
     # E-value with gamma = 0.9
     # Reject if e-value is greater than 20.
-    df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.9, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+2]  <- rej
     
     # Reject if it chooses SBM with 5 communities
@@ -253,7 +252,7 @@ for(delta in delta.seq){
 
 load("~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_111725.RData")
 
-df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej), time=mean(time))
+df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
 p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   geom_point()+
