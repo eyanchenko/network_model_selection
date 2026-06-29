@@ -1,12 +1,14 @@
 ## Paper: Universal inference for model selection on networks
 ## Author: Eric Yanchenko
-## Akita International University
+## University: Akita International University
+## Date: June 29, 2026
 
 source("~/Documents/Research/network_model_selection/netcrop.R")
 source("~/Documents/Research/network_model_selection/functions.R")
 
 library(ggplot2)
 library(dplyr)
+library(ggpubr)
 
 ## Setting 1 (a) - H0: SBM w/ K=1 (ER) vs. H1: SBM w/ K=2
 ## Increasing community structure strength
@@ -49,7 +51,7 @@ for(beta in beta.seq){
     # Reject if e-value is greater than 20.
     df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "ER", "SBM", 2, 2, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+1]  <- rej
-    
+
     # E-value with gamma = 0.9
     # Reject if e-value is greater than 20.
     df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "ER", "SBM", 2, 2, 0.9, nreps = nreps, ncores = detectCores()-1) > 20))[3]
@@ -65,13 +67,13 @@ for(beta in beta.seq){
   
     cnt = cnt + length(methods)
 
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta_111725.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta_062626.RData")
 
   }
   print(beta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta_111725.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_beta_062626.RData")
 
 df_plot <- df %>% group_by(Method, beta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -80,20 +82,10 @@ p1 <- ggplot(df_plot, aes(x=beta, y=rej, color=Method))+
   geom_line()+
   xlab(expression(beta))+
   ylab("Rejection Rate")+
-  theme_bw()
+  theme_bw()+
+  theme(text = element_text(size = 16))
 p1
 
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_beta_111725.pdf", height=4, width=6, unit="in")
-
-p2 <- ggplot(df_plot, aes(x=beta, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(beta))+
-  ylab("Time (sec)")+
-  theme_bw()
-
-library(ggpubr)
-ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 
 ## Setting 1 (b) - H0: SBM w/ K=1 (ER) vs. H1: SBM w/ K=2
 ## Increasing community size
@@ -154,37 +146,28 @@ for(delta in delta.seq){
     df$rej[cnt+4] <- rej
 
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_111725.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_062626.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_111725.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_K2_delta_062626.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
-p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
+p2 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   geom_point()+
   geom_line()+
   xlab(expression(delta))+
-  ylab("Rejection Rate")+
-  theme_bw()
-p1
- 
-
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_delta_111725.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=delta, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(delta))+
-  ylab("Time (sec)")+
-  theme_bw()
+  ylab("")+
+  theme_bw()+
+  theme(text = element_text(size = 16))
+p2
 
 
 ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
+ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K2_062626.pdf", height=4, width=8, unit="in")
 
 
 ## Setting 1 (c) - H0: SBM w/ K=4 vs. H1: SBM w/ K=5
@@ -225,32 +208,32 @@ for(delta in delta.seq){
     df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.1, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt]  <- rej
     
-    # E-value with gamma = 0.5
-    # Reject if e-value is greater than 20.
-    df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    df$rej[cnt+1]  <- rej
-    
-    # E-value with gamma = 0.9
-    # Reject if e-value is greater than 20.
-    df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.9, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    df$rej[cnt+2]  <- rej
-    
-    # Reject if it chooses SBM with 5 communities
-    df$time[cnt+3] <- system.time(rej <- as.numeric(netcrop_sbm_sims(A, c(4,5), s=5, o=100, R=1, loss="l2")=="SBM-5"))[3]
-    df$rej[cnt+3] <- rej
+    # # E-value with gamma = 0.5
+    # # Reject if e-value is greater than 20.
+    # df$time[cnt+1] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.5, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    # df$rej[cnt+1]  <- rej
+    # 
+    # # E-value with gamma = 0.9
+    # # Reject if e-value is greater than 20.
+    # df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "SBM", K-1, K, 0.9, nreps = nreps, ncores = detectCores()-1) > 20))[3]
+    # df$rej[cnt+2]  <- rej
+    # 
+    # # Reject if it chooses SBM with 5 communities
+    # df$time[cnt+3] <- system.time(rej <- as.numeric(netcrop_sbm_sims(A, c(4,5), s=5, o=100, R=1, loss="l2")=="SBM-5"))[3]
+    # df$rej[cnt+3] <- rej
     
     # Reject if it chooses SBM with 5 communities (ECV)
     df$time[cnt+4] <- system.time(rej <- as.numeric(ecv_sbm_sims(A, c(4,5))=="SBM-5"))[3]
     df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_111725.RData")
+    #save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_062626.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_111725.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_K5_delta_062626.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -259,18 +242,7 @@ p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   geom_line()+
   xlab(expression(delta))+
   ylab("Rejection Rate")+
-  theme_bw()
+  theme_bw()+
+  theme(text = element_text(size = 16))
 p1
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K5_delta_111725.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=delta, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(delta))+
-  ylab("Time (sec)")+
-  theme_bw()
-
-ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
-
-
+ggsave("~/Documents/Research/network_model_selection/Figures/sbm_K5_delta_062626.pdf", height=4, width=6, unit="in")

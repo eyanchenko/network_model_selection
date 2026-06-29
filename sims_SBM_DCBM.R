@@ -1,6 +1,7 @@
 ## Paper: Universal inference for model selection on networks
 ## Author: Eric Yanchenko
-## Akita International University
+## University: Akita International University
+## Date: June 29, 2026
 
 
 source("~/Documents/Research/network_model_selection/netcrop.R")
@@ -8,6 +9,7 @@ source("~/Documents/Research/network_model_selection/functions.R")
 
 library(ggplot2)
 library(dplyr)
+library(ggpubr)
 
 
 ## Setting 3 (a) -  H0: SBM w/ K=2  vs. H1: DCBM w/ K=2
@@ -15,7 +17,6 @@ library(dplyr)
 niter = 200
 nreps = 100
 
-### Are these the settings that we used?
 n = 1000
 alpha = 0.25
 beta = 0.50
@@ -74,13 +75,13 @@ for(nu in nu.seq){
     
     cnt = cnt + length(methods)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K2_nu.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K2_nu_062626.RData")
     
   }
   print(nu)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K2_nu.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K2_nu_062626.RData")
 
 df_plot <- df %>% group_by(Method, nu) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -89,20 +90,9 @@ p1 <- ggplot(df_plot, aes(x=nu, y=rej, color=Method))+
   geom_line()+
   xlab(expression(nu))+
   ylab("Rejection Rate")+
-  theme_bw()
+  theme_bw()+
+  theme(text = element_text(size = 16))
 p1
-
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_dcbm_K2_nu_111725.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=nu, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(nu))+
-  ylab("Time (sec)")+
-  theme_bw()
-ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
-
 
 ## Setting 3 (b) -  H0: SBM w/ K=5  vs. H1: DCBM w/ K=5
 ## Increasing variance of degree parameters
@@ -135,10 +125,7 @@ for(nu in nu.seq){
     
     params = list(psi=psi, B=B, C=C)
     A <- generateA("DCBM", params)
-    
-    eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1)
-    
-    
+
     # E-value with gamma = 0.4
     # Reject if e-value is greater than 20.
     df$time[cnt] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.4, nreps = nreps, ncores = detectCores()-1) > 20))[3]
@@ -153,7 +140,7 @@ for(nu in nu.seq){
     # Reject if e-value is greater than 20.
     df$time[cnt+2] <- system.time(rej <- as.numeric(eval_mc(A, "SBM", "DCBM", K, K, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+2]  <- rej
-    
+
     # Reject if it chooses DCBM with K communities
     df$time[cnt+3] <- system.time(
       rej <- as.numeric(netcrop_sbm_dcbm_sims(A, 5, s=5, o=100, R=1, loss="l2")=="DCSBM-5")
@@ -167,32 +154,28 @@ for(nu in nu.seq){
     df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
+    print(iter)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu_062626.RData")
     
   }
   print(nu)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu.RData")
+load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu_062626.RData")
 
 df_plot <- df %>% group_by(Method, nu) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
-p1 <- ggplot(df_plot, aes(x=nu, y=rej, color=Method))+
+p2 <- ggplot(df_plot, aes(x=nu, y=rej, color=Method))+
   geom_point()+
   geom_line()+
   xlab(expression(nu))+
-  ylab("Rejection Rate")+
-  theme_bw()
-p1
+  ylab("")+
+  theme_bw()+
+  theme(text = element_text(size = 16))
+p2
 
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_dcbm_K5_nu.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=nu, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(nu))+
-  ylab("Time (sec)")+
-  theme_bw()
 ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
+ggsave("~/Documents/Research/network_model_selection/Figures/sbm_dcbm_062626.pdf", height=4, width=8, unit="in")
+
+

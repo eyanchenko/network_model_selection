@@ -1,13 +1,13 @@
-## Data fission and UI for model selection on networks
-## Eric Yanchenko
-## May 1, 2025
+## Paper: Universal inference for model selection on networks
+## Author: Eric Yanchenko
+## University: Akita International University
+## Date: June 29, 2026
 
 
 source("~/Documents/Research/network_model_selection/functions.R")
 
 library(ggplot2)
 library(dplyr)
-
 
 ## Setting 4 (a) -  H0: DCBM w/ K=2  vs. H1: PABM w/ K=2
 niter = 200
@@ -19,9 +19,9 @@ K = 2
 C   = c(rep(1, delta*n), rep(2, (1-delta)*n))
 cat = c(rep(1,delta*n/2), rep(2,delta*n/2), rep(1,(1-delta)*n/2), rep(2,(1-delta)*n/2))
 
-nu.seq = seq(0.10, 0.25, length=16)
+nu.seq = seq(0.10, 0.16, length=7)
 
-methods = c("e-value0.2", "e-value0.4", "e-value0.5", "e-value0.6", "e-value0.8")
+methods = c("e-value0.2", "e-value0.4", "e-value0.5", "e-value0.6")
 
 df <- tibble(iter = rep(rep(1:niter,each=length(methods)), length(nu.seq)), 
              Method=rep(methods, niter*length(nu.seq)), 
@@ -74,20 +74,15 @@ for(nu in nu.seq){
     df$time[cnt+3] <- system.time(rej <- as.numeric(eval_mc(A, "DCBM", "PABM", K, K, 0.6, nreps = nreps, ncores = detectCores()-1) > 20))[3]
     df$rej[cnt+3]  <- rej
     
-    # E-value with gamma = 0.8
-    # Reject if e-value is greater than 20.
-    df$time[cnt+4] <- system.time(rej <- as.numeric(eval_mc(A, "DCBM", "PABM", K, K, 0.8, nreps = nreps, ncores = detectCores()-1) > 20))[3]
-    df$rej[cnt+4]  <- rej
-    
     cnt = cnt + length(methods)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_pabm_K2_nu.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_pabm_K2_nu_062626.RData")
   }
   print(nu)
 }
 
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_pabm_K2_nu.RData")
+load("~/Documents/Research/network_model_selection/Results/df_dcbm_pabm_K2_nu_062626.RData")
 
 df_plot <- df %>% group_by(Method, nu) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -96,10 +91,11 @@ p1 <- ggplot(df_plot, aes(x=nu, y=rej, color=Method))+
   geom_line()+
   xlab(expression(nu))+
   ylab("Rejection Rate")+
-  theme_bw()
+  theme_bw()+
+  theme(text = element_text(size = 16))
 p1
 
-ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_pabm_K5_nu.pdf", height=4, width=6, unit="in")
+ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_pabm_K5_nu_062626.pdf", height=4, width=6, unit="in")
 
 
 

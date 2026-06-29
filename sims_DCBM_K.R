@@ -1,6 +1,7 @@
 ## Paper: Universal inference for model selection on networks
 ## Author: Eric Yanchenko
-## Akita International University
+## University: Akita International University
+## Date: June 29, 2026
 
 
 source("~/Documents/Research/network_model_selection/netcrop.R")
@@ -8,6 +9,7 @@ source("~/Documents/Research/network_model_selection/functions.R")
 
 library(ggplot2)
 library(dplyr)
+library(ggpubr)
 
 ## Setting 2 (a) - H0: DCBM w/ K=1 (CL) vs. H1: DCBM w/ K=2
 ## Increasing community structure strength
@@ -68,13 +70,13 @@ for(beta in beta.seq){
     
     cnt = cnt + length(methods)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_beta_111725.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_beta_062626.RData")
     
   }
   print(beta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_K2_beta_111725.RData")
+load("~/Documents/Research/network_model_selection/Results/df_dcbm_K2_beta_062626.RData")
 
 df_plot <- df %>% group_by(Method, beta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -83,21 +85,10 @@ p1 <- ggplot(df_plot, aes(x=beta, y=rej, color=Method))+
   geom_line()+
   xlab(expression(beta))+
   ylab("Rejection Rate")+
-  theme_bw()
+  theme_bw()+
+  theme(text = element_text(size = 16))
 p1
 
-ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K2_beta_111725.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=beta, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(beta))+
-  ylab("Time (sec)")+
-  theme_bw()
-
-library(ggpubr)
-ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
 
 ## Setting 2 (b) - H0: DCBM w/ K=1 (CL) vs. H1: DCBM w/ K=2
 ## Increasing community size
@@ -161,35 +152,27 @@ for(delta in delta.seq){
     df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta_111725.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta_062626.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta_111725.RData")
+load("~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta_062626.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
-p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
+p2 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   geom_point()+
   geom_line()+
   xlab(expression(delta))+
-  ylab("Rejection Rate")+
-  theme_bw()
-p1
-ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K2_delta_111725.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=delta, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(delta))+
-  ylab("Time (sec)")+
-  theme_bw()
-
+  ylab("")+
+  theme_bw()+
+  theme(text = element_text(size = 16))
+p2
 
 ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
+ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K2_062626.pdf", height=4, width=8, unit="in")
 
 
 ## Setting 2 (c) - H0: DCBM w/ K=4 vs. H1: DCBM w/ K=5
@@ -252,13 +235,13 @@ for(delta in delta.seq){
     
 
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K5_delta_111725.RData")
+    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K5_delta_062626.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_K5_delta_111725.RData")
+load("~/Documents/Research/network_model_selection/Results/df_dcbm_K5_delta_062626.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej), time=mean(time))
 
@@ -268,18 +251,9 @@ p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   xlab(expression(delta))+
   ylab("Rejection Rate")+
   ylim(0,1)+
-  theme_bw()
+  theme_bw()+
+  theme(text = element_text(size = 16))
 p1
-ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K5_delta_111725.pdf", height=4, width=6, unit="in")
-
-
-p2 <- ggplot(df_plot, aes(x=delta, y=time, color=Method))+
-  geom_point()+
-  geom_line()+
-  xlab(expression(delta))+
-  ylab("Time (sec)")+
-  theme_bw()
-
-ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
+ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K5_delta_062626.pdf", height=4, width=6, unit="in")
 
 
