@@ -1,1 +1,2 @@
 # network_model_selection
+This respository houses the code to implement the proposed method from "Universal Inference for model selection on networks" by Eric Yanchenko, Jonathan P. Williams and Ryan Martin. The main method is in functions.R. The other code implements the simulated and real-data experiments in the paper, as well as the data to recreate the figures. Please cite the paper if you use these methods.
