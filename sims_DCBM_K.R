@@ -4,8 +4,8 @@
 ## Date: June 29, 2026
 
 
-source("~/Documents/Research/network_model_selection/netcrop.R")
-source("~/Documents/Research/network_model_selection/functions.R")
+source("netcrop.R")
+source("functions.R")
 
 library(ggplot2)
 library(dplyr)
@@ -70,13 +70,13 @@ for(beta in beta.seq){
     
     cnt = cnt + length(methods)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_beta_062626.RData")
+    save(df, file="df_dcbm_K2_beta_062626.RData")
     
   }
   print(beta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_K2_beta_062626.RData")
+load("df_dcbm_K2_beta_062626.RData")
 
 df_plot <- df %>% group_by(Method, beta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -152,13 +152,13 @@ for(delta in delta.seq){
     df$rej[cnt+4] <- rej
     
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta_062626.RData")
+    save(df, file="df_dcbm_K2_delta_062626.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_K2_delta_062626.RData")
+load("df_dcbm_K2_delta_062626.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -172,7 +172,7 @@ p2 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
 p2
 
 ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
-ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K2_062626.pdf", height=4, width=8, unit="in")
+ggsave("dcbm_K2_062626.pdf", height=4, width=8, unit="in")
 
 
 ## Setting 2 (c) - H0: DCBM w/ K=4 vs. H1: DCBM w/ K=5
@@ -235,13 +235,13 @@ for(delta in delta.seq){
     
 
     cnt = cnt + length(methods)
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_dcbm_K5_delta_062626.RData")
+    save(df, file="df_dcbm_K5_delta_062626.RData")
     
   }
   print(delta)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_dcbm_K5_delta_062626.RData")
+load("df_dcbm_K5_delta_062626.RData")
 
 df_plot <- df %>% group_by(Method, delta) %>% summarize(rej = mean(rej), time=mean(time))
 
@@ -254,6 +254,6 @@ p1 <- ggplot(df_plot, aes(x=delta, y=rej, color=Method))+
   theme_bw()+
   theme(text = element_text(size = 16))
 p1
-ggsave("~/Documents/Research/network_model_selection/Figures/dcbm_K5_delta_062626.pdf", height=4, width=6, unit="in")
+ggsave("dcbm_K5_delta_062626.pdf", height=4, width=6, unit="in")
 
 
