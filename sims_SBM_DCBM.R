@@ -4,8 +4,8 @@
 ## Date: June 29, 2026
 
 
-source("~/Documents/Research/network_model_selection/netcrop.R")
-source("~/Documents/Research/network_model_selection/functions.R")
+source("netcrop.R")
+source("functions.R")
 
 library(ggplot2)
 library(dplyr)
@@ -75,13 +75,13 @@ for(nu in nu.seq){
     
     cnt = cnt + length(methods)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K2_nu_062626.RData")
+    save(df, file="df_sbm_dcbm_K2_nu_062626.RData")
     
   }
   print(nu)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K2_nu_062626.RData")
+load("df_sbm_dcbm_K2_nu_062626.RData")
 
 df_plot <- df %>% group_by(Method, nu) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -156,13 +156,13 @@ for(nu in nu.seq){
     cnt = cnt + length(methods)
     print(iter)
     
-    save(df, file="~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu_062626.RData")
+    save(df, file="df_sbm_dcbm_K5_nu_062626.RData")
     
   }
   print(nu)
 }
 
-load("~/Documents/Research/network_model_selection/Results/df_sbm_dcbm_K5_nu_062626.RData")
+load("df_sbm_dcbm_K5_nu_062626.RData")
 
 df_plot <- df %>% group_by(Method, nu) %>% summarize(rej = mean(rej, na.rm=TRUE), time=mean(time))
 
@@ -176,6 +176,6 @@ p2 <- ggplot(df_plot, aes(x=nu, y=rej, color=Method))+
 p2
 
 ggarrange(p1, p2, ncol=2, common.legend = TRUE, legend="bottom")
-ggsave("~/Documents/Research/network_model_selection/Figures/sbm_dcbm_062626.pdf", height=4, width=8, unit="in")
+ggsave("sbm_dcbm_062626.pdf", height=4, width=8, unit="in")
 
 
