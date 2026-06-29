@@ -343,7 +343,7 @@ eval <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM"), h1=c("CL", "SBM", "
 #' @param gamma parameter in edge-splitting
 #' @param nreps number of repetitions of the data split
 #' @param ncores number of cores for parallel computing
-#' @return Median e-value of nreps data splits
+#' @return Mean e-value of nreps data splits
 #' @export
 eval_mc <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM"), h1=c("CL", "SBM", "DCBM", "PABM"), 
                  h0K, h1K, gamma=0.5, nreps, ncores){
@@ -365,8 +365,8 @@ eval_mc <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM"), h1=c("CL", "SBM"
   if(mean(is.na(out)) > 0.10){
     stop("More than 10% of the iterations yielded an error.")
   }else{
-    # Return the median (and remove missing values)
-    return(median(out, na.rm = TRUE))
+    # Return the mean (and remove missing values)
+    return(mean(out, na.rm = TRUE))
   }
   
 }
@@ -374,6 +374,98 @@ eval_mc <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM"), h1=c("CL", "SBM"
 
 
 
+eval_log <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM"), h1=c("CL", "SBM", "DCBM", "PABM"), h0K, h1K, gamma=0.5){
+  
+  if(h0==h1 && h0K==h1K){
+    stop("Null and alterantive hypotheses must be differnet.")
+  }
+  
+  if(h1=="ER"){
+    stop("Alternative hypothesis cannot be Erdos-Renyi.")
+  }
+  
+  
+  if(!(h0 %in% c("ER", "CL", "SBM", "DCBM", "PABM"))){
+    stop("Please enter a valid model name. Erdos-Renyi (=ER), Chung-Lu (=CL),
+    Stochastic-block model (=SBM), degree-corrected block model (DCBM),
+    Popularity adjusted block model (=PABM)")
+  }
+  
+  if(!(h1 %in% c("CL", "SBM", "DCBM", "PABM"))){
+    stop("Please enter a valid model name. Chung-Lu (=CL),
+    Stochastic-block model (=SBM), degree-corrected block model (DCBM),
+         Popularity adjusted block model (=PABM)")
+  }
+  
+  out = edge_sample(A, gamma)
+  Y = out$Y
+  Z = out$Z
+  
+  if(h1=="CL"){
+    paramsY = estparam(Y, "CL")
+    paramsY$psi = paramsY$psi * sqrt(gamma)/ sqrt(1-gamma)
+  }else if(h1=="SBM" || h1=="DCBM"){
+    
+    if(h1 == "SBM")  CY = randnet::reg.SP(A = Y, K = h1K, tau = 1)$cluster  # regular spectral clustering
+    if(h1 == "DCBM") CY = randnet::reg.SSP(A = Y, K = h1K, tau = 1)$cluster # spherical spectral clustering
+    
+    paramsY = estparam(Y, h1, CY)
+    paramsY$B = paramsY$B * gamma / (1-gamma)
+  }else if(h1=="PABM"){
+    CY = randnet::reg.SSP(A = Y, K = h1K, tau = 1)$cluster
+    paramsY = estparam(Y, "PABM", CY)
+    paramsY$lambda = paramsY$lambda * sqrt(gamma) / sqrt((1-gamma))
+  }
+  
+  # Evaluate log-likelihood using parameters from Y on network Z
+  L1 = llike(Z, h1, paramsY)
+  
+  # Estimate parameters under H0
+  if(h0=="ER"){
+    paramsZ = estparam(Z, "ER")
+  }else if(h0=="CL"){
+    paramsZ = estparam(Z, "CL")
+  }else if(h0=="SBM"){
+    CZ = randnet::reg.SP(A = Z, K = h0K, tau = 1)$cluster # regular spectral clustering
+    paramsZ = estparam(Z, h0, CZ)
+  }else if(h0=="DCBM"){
+    CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 1)$cluster # spherical spectral clustering
+    paramsZ = estparam(Z, h0, CZ)
+  }else if(h0=="PABM"){
+    CZ = randnet::reg.SSP(A = Z, K = h0K, tau = 1)$cluster # spherical spectral clustering
+    paramsZ = estparam(Z, h0, CZ)
+  }
+  # Evaluate log-likelihood using Z and parameters from Z
+  L0 = llike(Z, h0, paramsZ)
+  
+  # Return the quotient, but upper bound it at ub for numerical stability
+  return(L1 - L0)
+}
 
+eval_mc_log <- function(A, h0=c("ER", "CL", "SBM", "DCBM", "PABM"), h1=c("CL", "SBM", "DCBM", "PABM"), 
+                    h0K, h1K, gamma=0.5, nreps, ncores){
+  
+  apply_fun <- function(i){
+    
+    err <- try(eval_log(A, h0, h1, h0K, h1K, gamma),TRUE)
+    
+    if(class(err)=="try-error"){
+      return(NA)
+    }else{
+      return(err)
+    }
+    
+  }
+  
+  out <- unlist(parallel::mclapply(1:nreps, apply_fun, mc.cores = ncores))
+  
+  if(mean(is.na(out)) > 0.10){
+    stop("More than 10% of the iterations yielded an error.")
+  }else{
+    # Return the median (and remove missing values)
+    return(median(out, na.rm = TRUE))
+  }
+  
+}
 
 
