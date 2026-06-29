@@ -99,13 +99,13 @@ p1
 
 n = 1000
 alpha = 0.25
-beta = 0.90
+beta = 0.80
 K = 5
 B = alpha * (beta*diag(K) + (1-beta)*matrix(1, K, K))
 #pi = c(0.40, 0.15, 0.15, 0.15, 0.15)
 pi = rep(1/K, K)
 
-nu.seq <- seq(0, 0.75, length=21)
+nu.seq <- seq(0.25, 0.75, length=11)
 
 methods = c("e-value0.4", "e-value0.5", "e-value0.6", "NETCROP", "ECV")
 
